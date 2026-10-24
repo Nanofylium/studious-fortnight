@@ -150,7 +150,7 @@ export function limitTruePeak(buffer, ceilingDb, { releaseMs = 120, lookMs = 2.5
   return { grDb: -gainToDb(minG), truePeakDb: truePeakDb(buffer) };
 }
 
-function fftInPlace(re, im) {
+export function fftInPlace(re, im) {
   const n = re.length;
   for (let i = 1, j = 0; i < n; i++) {
     let bit = n >> 1;
