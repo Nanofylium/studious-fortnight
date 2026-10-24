@@ -12,6 +12,7 @@ import { encodeWav, clamp } from '@/lib/audio/dsp';
 import { renderMaster, renderMix } from '@/lib/audio/chain';
 import { integratedLufs } from '@/lib/audio/loudness';
 import { matchCurve, matchWidth, spectralProfile } from '@/lib/audio/reference';
+import { planMix } from '@/lib/audio/mixplan';
 import { StudioEngine } from '@/lib/audio/engine';
 import { loadStemFiles, pickStemFiles } from '@/lib/audio/loader';
 
@@ -34,6 +35,8 @@ export default function Studio() {
     streaming: true,
     makeupDb: 0,
     bypass: false,
+    smartMix: true,
+    ambience: 0.5,
   });
   const [baseline, setBaseline] = useState(null);
   const [after, setAfter] = useState(null);
@@ -57,9 +60,13 @@ export default function Studio() {
     return reference.curve.map((g) => g * reference.amount);
   }, [reference]);
 
+  // Smart mix plan: derived from the stems alone, so it is computed once per
+  // stem set; the toggle and the ambience amount live in `master`.
+  const mixPlan = useMemo(() => planMix(stems), [stems]);
+
   const params = useMemo(
-    () => ({ ...master, stems: mixParams, soloId, matchCurve: scaledCurve }),
-    [master, mixParams, soloId, scaledCurve],
+    () => ({ ...master, stems: mixParams, soloId, matchCurve: scaledCurve, mixPlan }),
+    [master, mixParams, soloId, scaledCurve, mixPlan],
   );
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -429,6 +436,7 @@ export default function Studio() {
             <aside className="space-y-5">
               <MasterPanel
                 master={master}
+                mixPlan={mixPlan}
                 getAnalyser={getAnalyser}
                 onMaster={handleMasterPatch}
                 onAuto={handleAuto}

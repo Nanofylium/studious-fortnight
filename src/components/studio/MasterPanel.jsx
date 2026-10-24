@@ -6,6 +6,13 @@ import { Switch } from '@/components/ui/switch';
 import MasterMeter from './MasterMeter';
 
 const CHAIN = ['De-metálico', 'Calor', 'Fita', 'Compressão', 'Largura', 'Limitador'];
+// The smart-mix moves the current plan actually makes.
+function smartChain(plan) {
+  if (!plan) return [];
+  return [plan.pocketHz && 'Espaço p/ voz', plan.vocalEnv && 'De-esser', plan.mudCutDb > 0.1 && 'Corte de embolo', 'Sala'].filter(
+    Boolean,
+  );
+}
 
 const TARGETS = [
   { value: -16, label: 'Dinâmico' },
@@ -93,8 +100,43 @@ function ReferenceBlock({ reference, busy, onReference, onAmount, onClear }) {
   );
 }
 
+// Smart per-stem mix: what it found (vocal pocket) and how much room.
+function SmartMixBlock({ master, mixPlan, onMaster }) {
+  const on = master.smartMix !== false;
+  const hint = !mixPlan
+    ? 'Ajusta cada stem como um engenheiro de mixagem.'
+    : mixPlan.pocketHz
+      ? `Abre espaço para a voz em ${(mixPlan.pocketHz / 1000).toFixed(1)} kHz enquanto ela canta, controla os "s" e junta tudo numa sala.`
+      : 'Sem stem de voz: limpa graves e embolo e junta os stems numa sala.';
+  return (
+    <div className={`mb-4 rounded-2xl border px-3 py-2.5 ${on ? 'border-primary/40 bg-primary/[0.07]' : 'border-hairline'}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[12px] font-medium">Mix inteligente</p>
+          <p className="text-[10px] leading-snug text-muted-foreground">{hint}</p>
+        </div>
+        <Switch checked={on} onCheckedChange={(v) => onMaster({ smartMix: v })} aria-label="Mix inteligente" />
+      </div>
+      {on && (
+        <div className="mt-3">
+          <ParamRow
+            label="Ambiência"
+            value={master.ambience ?? 0.5}
+            display={`${Math.round((master.ambience ?? 0.5) * 100)}%`}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => onMaster({ ambience: v })}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MasterPanel({
   master,
+  mixPlan,
   getAnalyser,
   onMaster,
   onAuto,
@@ -149,10 +191,12 @@ export default function MasterPanel({
         onClear={onClearReference}
       />
 
+      <SmartMixBlock master={master} mixPlan={mixPlan} onMaster={onMaster} />
+
       <MasterMeter getAnalyser={getAnalyser} />
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        {CHAIN.map((step) => (
+        {[...(master.smartMix !== false ? smartChain(mixPlan) : []), ...CHAIN].map((step) => (
           <span
             key={step}
             className={`rounded-full border px-2 py-[3px] text-[9px] uppercase tracking-[0.12em] ${
