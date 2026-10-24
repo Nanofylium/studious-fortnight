@@ -1,5 +1,3 @@
-const db = globalThis.__B44_DB__ || { auth:{ isAuthenticated: async()=>false, me: async()=>null }, entities:new Proxy({}, { get:()=>({ filter:async()=>[], get:async()=>null, create:async()=>({}), update:async()=>({}), delete:async()=>({}) }) }), integrations:{ Core:{ UploadFile:async()=>({ file_url:'' }) } } };
-
 # AGENTS.md
 
 ## Project Context
@@ -10,8 +8,8 @@ Start with `README.md` for local setup, environment variables, and publish workf
 
 ## Base44 References
 
-- CLI overview: https://docs.db.com/developers/references/cli/get-started/overview.md
-- Agent skills: https://docs.db.com/developers/backend/overview/skills.md
+- CLI overview: https://docs.base44.com/developers/references/cli/get-started/overview.md
+- Agent skills: https://docs.base44.com/developers/backend/overview/skills.md
 
 If your agent supports Agent Skills, install or update Base44 skills before Base44-specific work:
 
