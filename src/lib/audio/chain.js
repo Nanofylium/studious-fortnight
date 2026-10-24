@@ -189,7 +189,14 @@ export function buildGraph(ctx, stems, params, options = {}) {
 
   const sideWidth = ctx.createGain();
   sideWidth.gain.value = 1;
-  sideSum.connect(sideWidth);
+  // Mono bass, as in mastering for vinyl and clubs: the side loses its lows,
+  // so the low end stays centred and solid whatever the width.
+  const sideHp = ctx.createBiquadFilter();
+  sideHp.type = 'highpass';
+  sideHp.frequency.value = 10;
+  sideHp.Q.value = 0.6;
+  sideSum.connect(sideHp);
+  sideHp.connect(sideWidth);
 
   const merger = ctx.createChannelMerger(2);
   const mL = ctx.createGain();
@@ -273,6 +280,7 @@ export function buildGraph(ctx, stems, params, options = {}) {
       matchConv,
       matchCurve: null,
       sideWidth,
+      sideHp,
       tapePre,
       tapeShape,
       tapeDc,
@@ -353,9 +361,10 @@ export function applyParams(graph, params, stems) {
   m.roomReturn.gain.value = 1.4;
   m.glue.ratio.value = bypass ? 1 : 1.8;
   m.glue.threshold.value = bypass ? 0 : -16;
-  m.shelfLo.gain.value = bypass ? 0 : 1.6;
-  m.shelfHi.gain.value = bypass ? 0 : 1.1;
+  m.shelfLo.gain.value = bypass ? 0 : clamp(params.lowShelfDb ?? 1.6, -6, 6);
+  m.shelfHi.gain.value = bypass ? 0 : clamp(params.highShelfDb ?? 1.1, -6, 6);
   m.sideWidth.gain.value = width;
+  m.sideHp.frequency.value = bypass ? 10 : 100;
 
   // The FIR is designed at the context's own rate, which can differ from the
   // stems' (a 48 kHz device playing 44.1 kHz files).

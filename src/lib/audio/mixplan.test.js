@@ -105,6 +105,12 @@ test('planMix: no vocal stem means no pocket and no de-esser', () => {
   assert.equal(planMix([]), null);
 });
 
+test('planMix: a single file is treated as a finished mix', () => {
+  const plan = planMix([stem('m', 'other', song(2, 6))]);
+  assert.equal(plan.perStem.m.highpassHz, 28);
+  assert.ok(plan.perStem.m.send <= 0.05);
+});
+
 test('roomImpulse: unit energy, pre-delay, decorrelated channels', () => {
   const [l, r] = roomImpulse(SR);
   const pre = Math.round(0.018 * SR);

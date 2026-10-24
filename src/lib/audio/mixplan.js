@@ -116,6 +116,10 @@ export function planMix(stems) {
   const seconds = stems.reduce((m, s) => Math.max(m, s.buffer.length / s.buffer.sampleRate), 0);
   const vocals = stems.filter((s) => s.role?.key === 'vocals');
   const lead = vocals[0] || null;
+  // A single file is a finished mix, not a stem: its role is a guess from the
+  // file name, so role high-pass and sends would cut real bass and wash the
+  // whole song in the room.
+  const fullMix = stems.length === 1;
 
   // Where the vocal lives: its strongest presence frequency.
   const pocketHz = lead?.analysis?.sp ? clamp(peakFrequency(lead.analysis.sp, 1500, 4500), 1500, 4500) : null;
@@ -148,11 +152,11 @@ export function planMix(stems) {
     }
     perStem[s.id] = {
       role,
-      highpassHz: HIGHPASS[role] ?? 80,
+      highpassHz: fullMix ? 28 : HIGHPASS[role] ?? 80,
       mudCutDb: role === 'bass' || role === 'drums' ? 0 : mudCutDb,
       pocket,
       deEss,
-      send: SEND[role] ?? 0.1,
+      send: fullMix ? 0.03 : SEND[role] ?? 0.1,
       vocal: role === 'vocals',
     };
   }

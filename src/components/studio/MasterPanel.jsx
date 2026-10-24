@@ -107,7 +107,9 @@ function SmartMixBlock({ master, mixPlan, onMaster }) {
     ? 'Ajusta cada stem como um engenheiro de mixagem.'
     : mixPlan.pocketHz
       ? `Abre espaço para a voz em ${(mixPlan.pocketHz / 1000).toFixed(1)} kHz enquanto ela canta, controla os "s" e junta tudo numa sala.`
-      : 'Sem stem de voz: limpa graves e embolo e junta os stems numa sala.';
+      : Object.keys(mixPlan.perStem).length === 1
+        ? 'Uma faixa só (mix pronta): só um toque de sala. Para mixar de verdade, suba os stems.'
+        : 'Sem stem de voz: limpa graves e embolo e junta os stems numa sala.';
   return (
     <div className={`mb-4 rounded-2xl border px-3 py-2.5 ${on ? 'border-primary/40 bg-primary/[0.07]' : 'border-hairline'}`}>
       <div className="flex items-center justify-between gap-3">
