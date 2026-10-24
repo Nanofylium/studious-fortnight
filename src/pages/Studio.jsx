@@ -9,7 +9,9 @@ import StudioTopBar from '@/components/studio/StudioTopBar';
 import Transport from '@/components/studio/Transport';
 import { autoMix, excerptMixLufs, harshnessOf, suggestedMaster, summarizeMix, unityMix } from '@/lib/audio/analysis';
 import { encodeWav, clamp } from '@/lib/audio/dsp';
-import { renderMaster } from '@/lib/audio/chain';
+import { renderMaster, renderMix } from '@/lib/audio/chain';
+import { integratedLufs } from '@/lib/audio/loudness';
+import { matchCurve, matchWidth, spectralProfile } from '@/lib/audio/reference';
 import { StudioEngine } from '@/lib/audio/engine';
 import { loadStemFiles, pickStemFiles } from '@/lib/audio/loader';
 
@@ -41,15 +43,23 @@ export default function Studio() {
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [dragging, setDragging] = useState(false);
+  // Reference track: the full-strength match curve and how much of it to use.
+  const [reference, setReference] = useState(null);
+  const [referenceBusy, setReferenceBusy] = useState(false);
 
   const engineRef = useRef(null);
   const seekRef = useRef(0);
   const dragCount = useRef(0);
   const addInputRef = useRef(null);
 
+  const scaledCurve = useMemo(() => {
+    if (!reference || reference.amount <= 0) return null;
+    return reference.curve.map((g) => g * reference.amount);
+  }, [reference]);
+
   const params = useMemo(
-    () => ({ ...master, stems: mixParams, soloId }),
-    [master, mixParams, soloId],
+    () => ({ ...master, stems: mixParams, soloId, matchCurve: scaledCurve }),
+    [master, mixParams, soloId, scaledCurve],
   );
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -230,6 +240,48 @@ export default function Studio() {
     }));
   }, [stems, mixParams]);
 
+  // Analyses the reference against the current mix (rendered without any
+  // previous match), then sets the match curve, the width and the loudness
+  // target from it.
+  const handleReference = useCallback(
+    async (file) => {
+      if (!file || !stems.length) return;
+      setReferenceBusy(true);
+      setError(null);
+      try {
+        const decodeCtx = new OfflineAudioContext(2, 1, 44100);
+        const refBuffer = await decodeCtx.decodeAudioData(await file.arrayBuffer());
+        const refProfile = spectralProfile(refBuffer);
+        const refLufs = integratedLufs(refBuffer);
+        const mixBuffer = await renderMix(stems, { ...paramsRef.current, matchCurve: null, bypass: false });
+        const mixProfile = spectralProfile(mixBuffer);
+        setReference({
+          name: file.name.replace(/\.[^.]+$/, ''),
+          lufs: refLufs,
+          curve: matchCurve(mixProfile, refProfile),
+          amount: 0.8,
+        });
+        const target = clamp(Math.round(refLufs * 2) / 2, -16, -7);
+        handleMasterPatch({
+          width: matchWidth(paramsRef.current.width, mixProfile, refProfile),
+          targetLufs: target,
+          streaming: target === -14,
+        });
+      } catch (e) {
+        setError(`Não foi possível usar a referência. ${e?.message || ''}`.trim());
+      } finally {
+        setReferenceBusy(false);
+      }
+    },
+    [stems, handleMasterPatch],
+  );
+
+  const handleReferenceAmount = useCallback((amount) => {
+    setReference((r) => (r ? { ...r, amount } : r));
+  }, []);
+
+  const handleClearReference = useCallback(() => setReference(null), []);
+
   const runRender = useCallback(
     async (download) => {
       if (!stems.length) return;
@@ -275,6 +327,7 @@ export default function Studio() {
     setBaseline(null);
     setAfter(null);
     setError(null);
+    setReference(null);
     setPlaying(false);
     setPosition(0);
     seekRef.current = 0;
@@ -374,7 +427,17 @@ export default function Studio() {
             </section>
 
             <aside className="space-y-5">
-              <MasterPanel master={master} getAnalyser={getAnalyser} onMaster={handleMasterPatch} onAuto={handleAuto} />
+              <MasterPanel
+                master={master}
+                getAnalyser={getAnalyser}
+                onMaster={handleMasterPatch}
+                onAuto={handleAuto}
+                reference={reference}
+                referenceBusy={referenceBusy}
+                onReference={handleReference}
+                onReferenceAmount={handleReferenceAmount}
+                onClearReference={handleClearReference}
+              />
               <ReportPanel
                 baseline={baseline}
                 after={after}
