@@ -12,6 +12,7 @@ function panLabel(pan) {
 
 export default function ChannelStrip({ stem, params, solo, progress, onParam, onSolo }) {
   const db = params.muted ? '—' : gainToDb(params.gain).toFixed(1);
+  const fixes = stem.repair ? stem.repair.clicks + stem.repair.dropouts + stem.repair.gaps : 0;
 
   return (
     <div
@@ -49,6 +50,11 @@ export default function ChannelStrip({ stem, params, solo, progress, onParam, on
           <p className="num text-[12px]">{db}</p>
           <p className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground">dB</p>
           <p className="num mt-2 text-[10px] text-muted-foreground">{stem.analysis.harshness > 0.5 ? 'áspero' : 'ok'}</p>
+          {fixes > 0 && (
+            <p className="num text-[10px] text-primary" title="Estalos, dropouts e buracos corrigidos ao carregar">
+              {fixes} {fixes === 1 ? 'reparo' : 'reparos'}
+            </p>
+          )}
         </div>
       </div>
 

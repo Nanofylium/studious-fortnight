@@ -80,9 +80,15 @@ export function detectBandwidth(buffer, { minDropDb = 24 } = {}) {
   const { frames, binHz, half } = frameSpectra(buffer, { fftSize: 4096, frames: 64 });
   if (!frames.length) return { cutoffHz: null, dropDb: 0, limited: false, airDb: null };
 
+  // Median over frames, not mean: a single click or the edge of a dropout is
+  // broadband and would otherwise paint over the cliff.
   const avg = new Float32Array(half);
-  for (const p of frames) for (let k = 0; k < half; k++) avg[k] += p[k];
-  for (let k = 0; k < half; k++) avg[k] /= frames.length;
+  const col = new Float32Array(frames.length);
+  for (let k = 0; k < half; k++) {
+    for (let f = 0; f < frames.length; f++) col[f] = frames[f][k];
+    col.sort();
+    avg[k] = col[frames.length >> 1];
+  }
   const db = new Float32Array(half);
   for (let k = 0; k < half; k++) db[k] = toDb(avg[k]);
 

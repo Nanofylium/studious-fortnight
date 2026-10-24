@@ -67,6 +67,7 @@ export default function StemDropzone({ onFiles, busy, error }) {
         <p className="mt-5 text-[12px] text-muted-foreground">
           {busy.phase === 'decode' && 'Decodificando'}
           {busy.phase === 'clean' && 'Limpando artefatos de'}
+          {busy.phase === 'repair' && 'Reparando falhas e som metálico de'}
           {busy.phase === 'analyze' && 'Analisando'}
           <span className="text-foreground"> {busy.name}</span>
           <span className="num ml-2">{busy.index}/{busy.total}</span>

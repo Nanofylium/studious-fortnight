@@ -32,7 +32,40 @@ function MetricRow({ label, before, after, suffix = '' }) {
   );
 }
 
-export default function ReportPanel({ baseline, after, target, ceiling, rendering, onRender }) {
+// What the repair stage did on load, summed over all stems.
+function RepairSummary({ repairs }) {
+  if (!repairs?.length) return null;
+  const sum = (k) => repairs.reduce((a, r) => a + (r[k] || 0), 0);
+  const holes = sum('dropouts') + sum('gaps');
+  const clicks = sum('clicks');
+  const left = sum('unrepaired');
+  const cutoffs = repairs.map((r) => r.cutoffHz).filter(Boolean);
+  const rings = repairs.reduce((a, r) => a + (r.resonances?.length || 0), 0);
+  const kHz = (hz) => (hz / 1000).toFixed(1).replace('.', ',');
+
+  return (
+    <div className="mt-3">
+      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-muted-foreground">Restauração</p>
+      <StatusRow
+        ok={left === 0}
+        label={`${clicks} ${clicks === 1 ? 'estalo' : 'estalos'} e ${holes} ${holes === 1 ? 'buraco' : 'buracos'}`}
+        detail={left === 0 ? (clicks + holes ? 'corrigidos' : 'nenhuma falha encontrada') : `corrigidos, ${left} longos demais para preencher`}
+      />
+      <StatusRow
+        ok
+        label={rings ? `${rings} ${rings === 1 ? 'ressonância metálica' : 'ressonâncias metálicas'}` : 'Sem ressonância metálica fixa'}
+        detail={rings ? 'atenuadas' : ''}
+      />
+      <StatusRow
+        ok
+        label={cutoffs.length ? `Agudos restaurados acima de ${kHz(Math.min(...cutoffs))} kHz` : 'Agudos completos'}
+        detail={cutoffs.length ? `em ${cutoffs.length} ${cutoffs.length === 1 ? 'stem' : 'stems'}` : 'nenhum corte detectado'}
+      />
+    </div>
+  );
+}
+
+export default function ReportPanel({ baseline, after, target, ceiling, repairs, rendering, onRender }) {
   if (!baseline) return null;
 
   const current = after || baseline;
@@ -102,6 +135,8 @@ export default function ReportPanel({ baseline, after, target, ceiling, renderin
           detail={check.peakOk ? `dentro do teto de ${ceiling} dBTP` : `acima do teto de ${ceiling} dBTP`}
         />
       </div>
+
+      <RepairSummary repairs={repairs} />
 
       <div className="mt-3">
         <div className="mb-1 grid grid-cols-[1fr_auto_auto] gap-3 text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
