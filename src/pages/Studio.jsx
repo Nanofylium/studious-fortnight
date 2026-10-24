@@ -331,7 +331,7 @@ export default function Studio() {
                   {busy && (
                     <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      {busy.phase === 'decode' ? 'Decodificando' : busy.phase === 'clean' ? 'Limpando' : 'Analisando'}{' '}
+                      {busy.phase === 'decode' ? 'Decodificando' : busy.phase === 'clean' ? 'Limpando' : busy.phase === 'repair' ? 'Reparando' : 'Analisando'}{' '}
                       {busy.name}
                     </span>
                   )}
@@ -380,6 +380,7 @@ export default function Studio() {
                 after={after}
                 target={master.targetLufs}
                 ceiling={master.ceilingDb}
+                repairs={stems.map((s) => s.repair).filter(Boolean)}
                 rendering={exporting}
                 onRender={handleRender}
               />
