@@ -21,6 +21,11 @@ export default {
         foreground: "hsl(var(--foreground))",
         panel: "hsl(var(--panel))",
         hairline: "hsl(var(--hairline))",
+        meter: {
+          low: "hsl(var(--meter-low))",
+          warn: "hsl(var(--meter-warn))",
+          clip: "hsl(var(--meter-clip))",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
