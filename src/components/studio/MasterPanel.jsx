@@ -1,5 +1,5 @@
-import React from 'react';
-import { Sparkles } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Disc3, Loader2, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -26,8 +26,89 @@ function ParamRow({ label, value, display, min, max, step, onChange }) {
   );
 }
 
-export default function MasterPanel({ master, getAnalyser, onMaster, onAuto }) {
+// Reference track: upload, strength of the tonal match, remove.
+function ReferenceBlock({ reference, busy, onReference, onAmount, onClear }) {
+  const inputRef = useRef(null);
+  const peak = reference
+    ? reference.curve.reduce((m, g) => (Math.abs(g) > Math.abs(m) ? g : m), 0) * reference.amount
+    : 0;
+
+  return (
+    <div className="mb-4 rounded-2xl border border-hairline px-3 py-2.5">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="audio/*"
+        className="hidden"
+        onChange={(e) => {
+          onReference(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      {!reference ? (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[12px] font-medium">Música de referência</p>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Suba uma faixa profissional do mesmo estilo: o Forja iguala timbre, largura e volume a ela.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 gap-1.5 text-[11px]"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+          >
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Disc3 className="h-3.5 w-3.5" />}
+            {busy ? 'Analisando' : 'Escolher'}
+          </Button>
+        </div>
+      ) : (
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Disc3 className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <p className="truncate text-[12px] font-medium" title={reference.name}>{reference.name}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="num text-[10px] text-muted-foreground">{reference.lufs.toFixed(1)} LUFS</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClear} aria-label="Remover referência">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <ParamRow
+            label="Igualar timbre"
+            value={reference.amount}
+            display={`${Math.round(reference.amount * 100)}% · ${peak >= 0 ? '+' : ''}${peak.toFixed(1)} dB`}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={onAmount}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function MasterPanel({
+  master,
+  getAnalyser,
+  onMaster,
+  onAuto,
+  reference,
+  referenceBusy,
+  onReference,
+  onReferenceAmount,
+  onClearReference,
+}) {
   const pct = (v) => `${Math.round(v * 100)}%`;
+  const refTarget = reference ? Math.max(-16, Math.min(-7, Math.round(reference.lufs * 2) / 2)) : null;
+  const targets = reference && !TARGETS.some((t) => t.value === refTarget)
+    ? [...TARGETS, { value: refTarget, label: 'Referência' }]
+    : TARGETS;
 
   return (
     <section className="rounded-3xl border border-hairline bg-panel/70 p-5">
@@ -59,6 +140,14 @@ export default function MasterPanel({ master, getAnalyser, onMaster, onAuto }) {
           onCheckedChange={(v) => onMaster(v ? { streaming: true, targetLufs: -14 } : { streaming: false })}
         />
       </div>
+
+      <ReferenceBlock
+        reference={reference}
+        busy={referenceBusy}
+        onReference={onReference}
+        onAmount={onReferenceAmount}
+        onClear={onClearReference}
+      />
 
       <MasterMeter getAnalyser={getAnalyser} />
 
@@ -116,8 +205,8 @@ export default function MasterPanel({ master, getAnalyser, onMaster, onAuto }) {
 
       <div className="mt-5">
         <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Volume alvo</p>
-        <div className="grid grid-cols-4 gap-1.5">
-          {TARGETS.map((t) => (
+        <div className={`grid gap-1.5 ${targets.length > 4 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          {targets.map((t) => (
             <button
               key={t.value}
               type="button"

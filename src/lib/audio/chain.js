@@ -1,5 +1,6 @@
 import { clamp, dbToGain, limitTruePeak, measure, saturationCurve, tapeCurve } from './dsp';
 import { integratedLufs } from './loudness';
+import { minimumPhaseFir } from './reference';
 
 // Builds the full signal chain once: per-stem correction -> fader/pan -> master bus.
 // The exact same graph is used for live playback and for the offline render,
@@ -79,6 +80,14 @@ export function buildGraph(ctx, stems, params, options = {}) {
   shelfHi.frequency.value = 12000;
   shelfHi.gain.value = 0;
 
+  // Reference match EQ: a minimum-phase FIR (see reference.js) in a
+  // convolver, crossfaded against a dry path so it costs nothing when unused.
+  const matchDry = ctx.createGain();
+  const matchWet = ctx.createGain();
+  matchWet.gain.value = 0;
+  const matchConv = ctx.createConvolver();
+  matchConv.normalize = false;
+
   // Mid/side stereo width stage
   const splitter = ctx.createChannelSplitter(2);
   const midL = ctx.createGain();
@@ -156,7 +165,11 @@ export function buildGraph(ctx, stems, params, options = {}) {
   mixBus.connect(glue);
   glue.connect(shelfLo);
   shelfLo.connect(shelfHi);
-  shelfHi.connect(splitter);
+  shelfHi.connect(matchDry);
+  shelfHi.connect(matchConv);
+  matchConv.connect(matchWet);
+  matchDry.connect(splitter);
+  matchWet.connect(splitter);
   merger.connect(tapePre);
   tapePre.connect(tapeShape);
   tapeShape.connect(tapeDc);
@@ -176,6 +189,10 @@ export function buildGraph(ctx, stems, params, options = {}) {
       glue,
       shelfLo,
       shelfHi,
+      matchDry,
+      matchWet,
+      matchConv,
+      matchCurve: null,
       sideWidth,
       tapePre,
       tapeShape,
@@ -238,6 +255,23 @@ export function applyParams(graph, params, stems) {
   m.shelfLo.gain.value = bypass ? 0 : 1.6;
   m.shelfHi.gain.value = bypass ? 0 : 1.1;
   m.sideWidth.gain.value = width;
+
+  // The FIR is designed at the context's own rate, which can differ from the
+  // stems' (a 48 kHz device playing 44.1 kHz files).
+  const curve = bypass ? null : params.matchCurve || null;
+  if (curve !== m.matchCurve) {
+    if (curve) {
+      const ctx = m.matchConv.context;
+      const fir = minimumPhaseFir(curve, ctx.sampleRate);
+      const ir = ctx.createBuffer(2, fir.length, ctx.sampleRate);
+      ir.copyToChannel(fir, 0);
+      ir.copyToChannel(fir, 1);
+      m.matchConv.buffer = ir;
+    }
+    m.matchCurve = curve;
+  }
+  m.matchDry.gain.value = curve ? 0 : 1;
+  m.matchWet.gain.value = curve ? 1 : 0;
   m.makeup.gain.value = bypass ? 1 : dbToGain(clamp(params.makeupDb ?? 0, -12, 18));
   m.limiter.ratio.value = bypass ? 1 : 20;
   // Limiting a touch below the ceiling leaves room for the limiter to catch
