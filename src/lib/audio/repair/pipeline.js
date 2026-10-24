@@ -19,7 +19,9 @@ export function repairChannels(channels, sampleRate) {
   const peaks = scan.resonances.peaks;
   const resonance = peaks.length ? clamp(0.45 + scan.resonances.score * 0.55, 0, 1) : 0;
   const air = scan.bandwidth.limited ? 0.6 : 0;
-  const stereo = channels.length > 1 ? 0.3 : 0;
+  // Incoherent highs in the side are AI "sizzle" only when the scan found
+  // artefacts; on clean material they are reverb and width, so leave them.
+  const stereo = channels.length > 1 && (peaks.length || scan.bandwidth.limited) ? 0.3 : 0;
   const out = demetallize(filled, sampleRate, scan, { resonance, air, stereo });
 
   const fixed = report.filter((r) => r.method !== 'none');

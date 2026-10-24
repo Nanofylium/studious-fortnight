@@ -75,6 +75,13 @@ export class StudioEngine {
         /* already started */
       }
     });
+    for (const src of this.graph.modSources) {
+      try {
+        src.start(startAt, Math.min(this.offset, Math.max(0, src.buffer.duration - 0.01)));
+      } catch (e) {
+        /* already started */
+      }
+    }
     this.startedAt = startAt - this.offset;
     this.playing = true;
   }

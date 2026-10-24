@@ -1,6 +1,41 @@
 import { clamp, dbToGain, limitTruePeak, measure, saturationCurve, tapeCurve } from './dsp';
 import { integratedLufs } from './loudness';
 import { minimumPhaseFir } from './reference';
+import { ENV_RATE, roomImpulse } from './mixplan';
+
+// Plays a precomputed 0..1 envelope (see mixplan.js) as an audio-rate signal.
+// It is started with the same offset as the stems, so the automation stays
+// locked to the music in live playback and in the render alike.
+function envelopeSource(ctx, env) {
+  const buf = ctx.createBuffer(1, env.length, ENV_RATE);
+  buf.copyToChannel(env, 0);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  return src;
+}
+
+// The room is the same for every graph at a given rate; seek and pause
+// rebuild the graph, so keep it.
+const rooms = new Map();
+function roomFor(sampleRate) {
+  if (!rooms.has(sampleRate)) rooms.set(sampleRate, roomImpulse(sampleRate));
+  return rooms.get(sampleRate);
+}
+
+// A peaking filter whose gain follows an envelope: base gain 0, plus the
+// envelope scaled by `depth` (a gain node set in applyParams, in dB).
+function dynamicPeak(ctx, freq, q, envSrc) {
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'peaking';
+  filter.frequency.value = freq;
+  filter.Q.value = q;
+  filter.gain.value = 0;
+  const depth = ctx.createGain();
+  depth.gain.value = 0;
+  envSrc.connect(depth);
+  depth.connect(filter.gain);
+  return { filter, depth };
+}
 
 // Builds the full signal chain once: per-stem correction -> fader/pan -> master bus.
 // The exact same graph is used for live playback and for the offline render,
@@ -8,7 +43,29 @@ import { minimumPhaseFir } from './reference';
 export function buildGraph(ctx, stems, params, options = {}) {
   const mixBus = ctx.createGain();
 
+  // Smart mix (mixplan.js): the plan is fixed when the graph is built; the
+  // amounts are set in applyParams.
+  const plan = params?.mixPlan || null;
+  const modSources = [];
+  const vocalEnvSrc = plan?.vocalEnv ? envelopeSource(ctx, plan.vocalEnv) : null;
+  if (vocalEnvSrc) modSources.push(vocalEnvSrc);
+
+  // One shared room for every stem, returned into the mix bus so it goes
+  // through the same glue and master as the dry sound.
+  const roomConv = ctx.createConvolver();
+  roomConv.normalize = false;
+  const [irL, irR] = roomFor(ctx.sampleRate);
+  const ir = ctx.createBuffer(2, irL.length, ctx.sampleRate);
+  ir.copyToChannel(irL, 0);
+  ir.copyToChannel(irR, 1);
+  roomConv.buffer = ir;
+  const roomReturn = ctx.createGain();
+  roomReturn.gain.value = 0;
+  roomConv.connect(roomReturn);
+  roomReturn.connect(mixBus);
+
   const stemNodes = stems.map((stem) => {
+    const sp = plan?.perStem?.[stem.id] || null;
     const src = ctx.createBufferSource();
     src.buffer = stem.buffer;
 
@@ -50,8 +107,26 @@ export function buildGraph(ctx, stems, params, options = {}) {
     const fader = ctx.createGain();
     const pan = ctx.createStereoPanner();
 
-    src.connect(hp);
-    hp.connect(harsh);
+    // Low-mid build-up cut, the vocal pocket and the de-esser.
+    const mud = ctx.createBiquadFilter();
+    mud.type = 'peaking';
+    mud.frequency.value = 300;
+    mud.Q.value = 1.2;
+    mud.gain.value = 0;
+    const pocket = sp?.pocket && vocalEnvSrc ? dynamicPeak(ctx, sp.pocket.freq, 1.4, vocalEnvSrc) : null;
+    let deEss = null;
+    if (sp?.deEss) {
+      const envSrc = envelopeSource(ctx, sp.deEss.env);
+      modSources.push(envSrc);
+      deEss = dynamicPeak(ctx, sp.deEss.freq, 2, envSrc);
+    }
+    const send = ctx.createGain();
+    send.gain.value = 0;
+
+    const chain = [hp, mud, pocket?.filter, deEss?.filter].filter(Boolean);
+    src.connect(chain[0]);
+    for (let k = 1; k < chain.length; k++) chain[k - 1].connect(chain[k]);
+    chain[chain.length - 1].connect(harsh);
     harsh.connect(air);
     air.connect(body);
     body.connect(shaper);
@@ -59,8 +134,10 @@ export function buildGraph(ctx, stems, params, options = {}) {
     comp.connect(fader);
     fader.connect(pan);
     pan.connect(mixBus);
+    pan.connect(send);
+    send.connect(roomConv);
 
-    return { src, hp, harsh, air, body, shaper, comp, fader, pan, drive: -1 };
+    return { src, hp, mud, pocket, deEss, send, plan: sp, harsh, air, body, shaper, comp, fader, pan, drive: -1 };
   });
 
   const glue = ctx.createDynamicsCompressor();
@@ -112,7 +189,14 @@ export function buildGraph(ctx, stems, params, options = {}) {
 
   const sideWidth = ctx.createGain();
   sideWidth.gain.value = 1;
-  sideSum.connect(sideWidth);
+  // Mono bass, as in mastering for vinyl and clubs: the side loses its lows,
+  // so the low end stays centred and solid whatever the width.
+  const sideHp = ctx.createBiquadFilter();
+  sideHp.type = 'highpass';
+  sideHp.frequency.value = 10;
+  sideHp.Q.value = 0.6;
+  sideSum.connect(sideHp);
+  sideHp.connect(sideWidth);
 
   const merger = ctx.createChannelMerger(2);
   const mL = ctx.createGain();
@@ -184,7 +268,9 @@ export function buildGraph(ctx, stems, params, options = {}) {
 
   return {
     stems: stemNodes,
+    modSources,
     master: {
+      roomReturn,
       mixBus,
       glue,
       shelfLo,
@@ -194,6 +280,7 @@ export function buildGraph(ctx, stems, params, options = {}) {
       matchConv,
       matchCurve: null,
       sideWidth,
+      sideHp,
       tapePre,
       tapeShape,
       tapeDc,
@@ -215,6 +302,14 @@ export function buildGraph(ctx, stems, params, options = {}) {
         }
         n.src.disconnect();
       }
+      for (const s of modSources) {
+        try {
+          s.stop();
+        } catch (e) {
+          /* not started yet */
+        }
+        s.disconnect();
+      }
       out.disconnect();
     },
   };
@@ -227,6 +322,8 @@ export function applyParams(graph, params, stems) {
   const width = bypass ? 1 : clamp(params.width ?? 1.15, 0.5, 1.8);
   const drive = clamp(w * 0.55 + d * 0.12, 0, 0.8);
   const ceiling = clamp(params.ceilingDb ?? -1, -6, 0);
+  const smart = bypass || params.smartMix === false ? 0 : 1;
+  const ambience = smart * clamp(params.ambience ?? 0.5, 0, 1);
 
   graph.stems.forEach((node, i) => {
     const stem = stems[i];
@@ -240,8 +337,19 @@ export function applyParams(graph, params, stems) {
     node.harsh.gain.value = -7.5 * d * weight;
     node.air.gain.value = -3.5 * d * weight;
     node.body.gain.value = 2.2 * w;
-    node.comp.ratio.value = bypass ? 1 : 1.9;
-    node.comp.threshold.value = bypass ? 0 : -20;
+    // A vocal gets the firmer, faster compression that keeps it in front.
+    const vocal = smart && node.plan?.vocal;
+    node.comp.ratio.value = bypass ? 1 : vocal ? 3 : 1.9;
+    node.comp.threshold.value = bypass ? 0 : vocal ? -24 : -20;
+    node.comp.attack.value = vocal ? 0.005 : 0.012;
+    node.comp.release.value = vocal ? 0.12 : 0.2;
+
+    const sp = node.plan;
+    node.hp.frequency.value = smart && sp ? sp.highpassHz : 28;
+    node.mud.gain.value = smart && sp ? -sp.mudCutDb : 0;
+    if (node.pocket) node.pocket.depth.gain.value = -smart * sp.pocket.depthDb;
+    if (node.deEss) node.deEss.depth.gain.value = -smart * sp.deEss.maxDb;
+    node.send.gain.value = sp ? ambience * sp.send : 0;
 
     if (Math.abs(node.drive - drive) > 0.02) {
       node.shaper.curve = saturationCurve(drive);
@@ -250,11 +358,13 @@ export function applyParams(graph, params, stems) {
   });
 
   const m = graph.master;
+  m.roomReturn.gain.value = 1.4;
   m.glue.ratio.value = bypass ? 1 : 1.8;
   m.glue.threshold.value = bypass ? 0 : -16;
-  m.shelfLo.gain.value = bypass ? 0 : 1.6;
-  m.shelfHi.gain.value = bypass ? 0 : 1.1;
+  m.shelfLo.gain.value = bypass ? 0 : clamp(params.lowShelfDb ?? 1.6, -6, 6);
+  m.shelfHi.gain.value = bypass ? 0 : clamp(params.highShelfDb ?? 1.1, -6, 6);
   m.sideWidth.gain.value = width;
+  m.sideHp.frequency.value = bypass ? 10 : 100;
 
   // The FIR is designed at the context's own rate, which can differ from the
   // stems' (a 48 kHz device playing 44.1 kHz files).
@@ -293,12 +403,15 @@ export function applyParams(graph, params, stems) {
 
 export async function renderMix(stems, params) {
   const sampleRate = stems[0].buffer.sampleRate;
-  const tail = Math.round(sampleRate * 0.4);
+  // Leave room for the shared reverb to ring out.
+  const roomTail = params.mixPlan && !params.bypass && params.smartMix !== false && (params.ambience ?? 0.5) > 0;
+  const tail = Math.round(sampleRate * (roomTail ? 1.6 : 0.4));
   const length = stems.reduce((max, s) => Math.max(max, s.buffer.length), 0) + tail;
   const ctx = new OfflineAudioContext(2, Math.max(sampleRate, length), sampleRate);
   const graph = buildGraph(ctx, stems, params);
   applyParams(graph, params, stems);
   for (const node of graph.stems) node.src.start(0);
+  for (const s of graph.modSources) s.start(0);
   return ctx.startRendering();
 }
 
