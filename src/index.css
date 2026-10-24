@@ -1,1 +1,67 @@
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Studio theme: dark console with an amber accent. Colours are HSL triplets so
+   Tailwind can apply opacity modifiers (bg-primary/10 and so on). */
+@layer base {
+  :root {
+    --background: 228 14% 7%;
+    --foreground: 40 20% 94%;
+    --panel: 228 13% 10%;
+    --hairline: 228 10% 18%;
+
+    --card: 228 13% 10%;
+    --card-foreground: 40 20% 94%;
+    --popover: 228 13% 10%;
+    --popover-foreground: 40 20% 94%;
+
+    --primary: 38 92% 50%;
+    --primary-foreground: 228 14% 7%;
+    --secondary: 228 10% 16%;
+    --secondary-foreground: 40 20% 94%;
+    --muted: 228 10% 14%;
+    --muted-foreground: 228 8% 60%;
+    --accent: 228 10% 16%;
+    --accent-foreground: 40 20% 94%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 40 20% 96%;
+
+    --border: 228 10% 18%;
+    --input: 228 10% 20%;
+    --ring: 38 92% 50%;
+    --radius: 0.75rem;
+
+    --meter-low: 152 60% 48%;
+    --meter-warn: 32 95% 55%;
+    --meter-clip: 0 80% 58%;
+
+    --chart-1: 38 92% 50%;
+    --chart-2: 199 89% 60%;
+    --chart-3: 258 90% 76%;
+    --chart-4: 158 64% 52%;
+    --chart-5: 351 95% 71%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  /* Numbers that change while you watch (meters, dB, time) keep their width. */
+  .num {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
