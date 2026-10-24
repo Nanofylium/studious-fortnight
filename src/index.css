@@ -34,6 +34,10 @@
     --ring: 38 92% 50%;
     --radius: 0.75rem;
 
+    --meter-low: 152 60% 48%;
+    --meter-warn: 32 95% 55%;
+    --meter-clip: 0 80% 58%;
+
     --chart-1: 38 92% 50%;
     --chart-2: 199 89% 60%;
     --chart-3: 258 90% 76%;
