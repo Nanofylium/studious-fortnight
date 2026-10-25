@@ -38,6 +38,8 @@ jobs:
       # (rolldown, etc.) that macOS and Windows need (npm/cli#4828).
       - run: npm install --no-audit --no-fund
       - run: npm test
+      # The stem-separation model ships inside the installer (offline use).
+      - run: node scripts/fetch-model.mjs
       - run: npm run build:desktop
       - run: npx electron-builder ${{ matrix.target }} --publish never
         env:
@@ -52,3 +54,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.files }}
+
+  # The AI stem separation with the real model (downloaded here; it is not in
+  # the repository): a synthetic song's parts must land in their own stems.
+  separation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: node scripts/fetch-model.mjs
+      - run: node scripts/check-separation.mjs
