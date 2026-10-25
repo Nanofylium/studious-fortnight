@@ -1,7 +1,10 @@
 {
   "name": "base44-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Forja: mixagem e masterização automáticas de stems da Suno",
+  "author": "Nanofylium",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +13,10 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test": "node --test 'src/lib/audio/**/*.test.js'"
+    "test": "node --test 'src/lib/audio/**/*.test.js'",
+    "build:desktop": "vite build --mode desktop",
+    "desktop": "vite build --mode desktop && electron .",
+    "dist:desktop": "vite build --mode desktop && electron-builder --publish never"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.57",
@@ -87,6 +93,8 @@
     "@vitejs/plugin-react": "^6.0.5",
     "autoprefixer": "^10.4.20",
     "baseline-browser-mapping": "^2.8.32",
+    "electron": "^38.8.6",
+    "electron-builder": "^26.18.0",
     "eslint": "^9.19.0",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.0.0",
@@ -98,5 +106,45 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.2",
     "vite": "^8.2.0"
-  }
+  },
+  "build": {
+    "appId": "com.nanofylium.forja",
+    "productName": "Forja",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "!node_modules/**"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Forja-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.music",
+      "artifactName": "Forja-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Audio",
+      "artifactName": "Forja-${version}.${ext}",
+      "executableName": "forja",
+      "syncDesktopName": true
+    }
+  },
+  "desktopName": "forja.desktop"
 }
