@@ -39,3 +39,4 @@ dist-ssr
 base44/.app.jsonc
 release
 package-lock.json
+public/models/

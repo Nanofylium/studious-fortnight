@@ -69,8 +69,13 @@ export default function StemDropzone({ onFiles, busy, error }) {
           {busy.phase === 'clean' && 'Limpando artefatos de'}
           {busy.phase === 'repair' && 'Reparando falhas e som metálico de'}
           {busy.phase === 'analyze' && 'Analisando'}
+          {busy.phase === 'separate' && 'Separando em voz, bateria, baixo e outros (IA)'}
           <span className="text-foreground"> {busy.name}</span>
-          <span className="num ml-2">{busy.index}/{busy.total}</span>
+          {busy.phase === 'separate' ? (
+            <span className="num ml-2">{Math.round((busy.progress || 0) * 100)}%</span>
+          ) : (
+            <span className="num ml-2">{busy.index}/{busy.total}</span>
+          )}
         </p>
       )}
       {error && <p className="mt-4 text-[12px] text-destructive">{error}</p>}

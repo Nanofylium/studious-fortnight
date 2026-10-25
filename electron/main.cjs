@@ -2,6 +2,7 @@
 // processing already runs locally (Web Audio + a Web Worker), so the shell
 // only serves the built files and handles windows and saving.
 const { app, BrowserWindow, dialog, protocol, net, shell } = require('electron');
+const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -13,6 +14,16 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ]);
 
+// Cross-origin isolation lets ONNX Runtime use threads (SharedArrayBuffer),
+// several times faster for the AI stem separation. Everything is local, so
+// nothing is lost by requiring it.
+function isolated(res) {
+  const headers = new Headers(res.headers);
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
 function serveDist() {
   protocol.handle('app', (request) => {
     const { pathname } = new URL(request.url);
@@ -22,7 +33,8 @@ function serveDist() {
     // outside dist is ever served.
     const inside = file.startsWith(DIST + path.sep);
     const target = inside && path.extname(file) ? file : path.join(DIST, 'index.html');
-    return net.fetch(pathToFileURL(target).toString());
+    if (!fs.existsSync(target)) return new Response('Not found', { status: 404 });
+    return net.fetch(pathToFileURL(target).toString()).then(isolated);
   });
 }
 

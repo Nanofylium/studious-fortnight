@@ -14,7 +14,8 @@ import { integratedLufs } from '@/lib/audio/loudness';
 import { matchCurve, matchWidth, spectralProfile } from '@/lib/audio/reference';
 import { planMix } from '@/lib/audio/mixplan';
 import { StudioEngine } from '@/lib/audio/engine';
-import { loadStemFiles, pickStemFiles } from '@/lib/audio/loader';
+import { loadStemFiles, pickStemFiles, stemFromChannels } from '@/lib/audio/loader';
+import { separateBuffer } from '@/lib/audio/separate/client';
 
 const STEM_COLORS = [
   '#f59e0b', '#38bdf8', '#a78bfa', '#34d399', '#fb7185', '#facc15',
@@ -101,7 +102,29 @@ export default function Studio() {
       setBusy({ phase: 'decode', name: files[0].name, index: 1, total: files.length });
       try {
         const decodeCtx = new OfflineAudioContext(2, 1, 44100);
-        const loaded = await loadStemFiles(files, decodeCtx, setBusy);
+        let loaded = await loadStemFiles(files, decodeCtx, setBusy);
+        // One finished song into an empty session: split it into stems with
+        // the AI model first, so the smart mix has parts to work on. If that
+        // fails the song is mastered as it is.
+        if (!stems.length && loaded.length === 1) {
+          const song = loaded[0];
+          setBusy({ phase: 'separate', name: files[0].name, index: 1, total: 1, progress: 0 });
+          try {
+            const parts = await separateBuffer(song.buffer, {
+              onProgress: (progress) => setBusy((b) => (b ? { ...b, progress } : b)),
+            });
+            loaded = parts.map((part, i) =>
+              stemFromChannels(part.channels, song.sampleRate, `${part.name}`, {
+                index: i,
+                // The song's repair report stays with the session.
+                repair: i === 0 ? song.repair : null,
+              }),
+            );
+          } catch (e) {
+            console.error('Stem separation failed', e);
+            setError('Não deu para separar em stems nesta máquina; masterizando a faixa inteira.');
+          }
+        }
         const next = [...stems, ...loaded].map((s, i) => ({ ...s, color: STEM_COLORS[i % STEM_COLORS.length] }));
         const levels = autoMix(next);
         const summary = summarizeMix(next);
@@ -391,7 +414,15 @@ export default function Studio() {
                   {busy && (
                     <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      {busy.phase === 'decode' ? 'Decodificando' : busy.phase === 'clean' ? 'Limpando' : busy.phase === 'repair' ? 'Reparando' : 'Analisando'}{' '}
+                      {busy.phase === 'decode'
+                        ? 'Decodificando'
+                        : busy.phase === 'clean'
+                          ? 'Limpando'
+                          : busy.phase === 'repair'
+                            ? 'Reparando'
+                            : busy.phase === 'separate'
+                              ? `Separando stems com IA ${Math.round((busy.progress || 0) * 100)}%`
+                              : 'Analisando'}{' '}
                       {busy.name}
                     </span>
                   )}

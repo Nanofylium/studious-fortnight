@@ -15,6 +15,23 @@ export function pickStemFiles(files, alreadyLoaded = 0) {
   return Array.from(files).filter(isAudioFile).slice(0, room);
 }
 
+// A stem made from raw channels (the AI separation's output), shaped like the
+// ones loadStemFiles returns.
+export function stemFromChannels(channels, sampleRate, name, { index = 0, repair = null } = {}) {
+  const buffer = new AudioBuffer({ numberOfChannels: channels.length, length: channels[0].length, sampleRate });
+  channels.forEach((ch, c) => buffer.copyToChannel(ch, c));
+  return {
+    id: `${Date.now().toString(36)}-s${index}-${Math.random().toString(36).slice(2, 7)}`,
+    name,
+    buffer,
+    duration: buffer.duration,
+    sampleRate,
+    analysis: analyzeStem(buffer),
+    role: guessRole(name),
+    repair,
+  };
+}
+
 // Decodes each stem, cleans the low-level artefact floor, repairs render
 // defects (clicks, holes, metallic ring, lost air) and measures it.
 export async function loadStemFiles(files, decodeCtx, onProgress, { repair = true } = {}) {
