@@ -1,8 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from '@/App.jsx'
 import '@/index.css'
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <App />
-)
+// The desktop build (vite --mode desktop) skips the Base44 auth shell.
+const load = import.meta.env.MODE === 'desktop' ? import('@/DesktopApp.jsx') : import('@/App.jsx')
+
+load.then(({ default: App }) => {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <App />
+  )
+})
