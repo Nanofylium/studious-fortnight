@@ -34,7 +34,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --no-audit --no-fund
+      # No lockfile on purpose: one written on Linux omits the native bindings
+      # (rolldown, etc.) that macOS and Windows need (npm/cli#4828).
+      - run: npm install --no-audit --no-fund
       - run: npm test
       - run: npm run build:desktop
       - run: npx electron-builder ${{ matrix.target }} --publish never
