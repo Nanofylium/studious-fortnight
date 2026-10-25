@@ -1,7 +1,9 @@
 // End-to-end check of the stem separation with the real model (needs
-// public/models/scnet, see fetch-model.mjs): a synthetic song of a sung tone,
-// a bass line and drum hits goes in, and each part must come out mostly in
-// its own stem. Run in CI, where the model can be downloaded.
+// public/models/scnet, see fetch-model.mjs): a synthetic song of a melodic
+// tone, a bass line and drum hits goes in. Bass and drums must come out in
+// their own stems; the tone, a synth to the model rather than a voice, must
+// land in a melodic stem (vocals or other), not in bass or drums. Run in CI,
+// where the model can be downloaded.
 import { separateChannels } from '../src/lib/audio/separate/core.js';
 
 const SR = 44100;
@@ -37,11 +39,12 @@ const corr = (a, b) => {
   return ab / Math.sqrt(aa * bb + 1e-20);
 };
 let ok = true;
-for (const key of ['vocals', 'bass', 'drums']) {
+const expect = { vocals: ['vocals', 'other'], bass: ['bass'], drums: ['drums'] };
+for (const key of Object.keys(expect)) {
   const row = stems.map((s) => corr(s.channels[0], parts[key]));
-  const own = row[stems.findIndex((s) => s.key === key)];
+  const best = stems[row.indexOf(Math.max(...row))].key;
   console.log(key.padEnd(7), stems.map((s, i) => `${s.key} ${row[i].toFixed(2)}`).join('  '));
-  if (!(own > 0.6 && own === Math.max(...row))) ok = false;
+  if (!(Math.max(...row) > 0.6 && expect[key].includes(best))) ok = false;
 }
 if (!ok) {
   console.error('a part did not come out in its own stem');
