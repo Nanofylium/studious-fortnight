@@ -6,8 +6,8 @@ test('suggestedMaster: follows the tonal balance of the song', () => {
   const base = { harshness: 0.36, metallic: null };
   const heavyDark = suggestedMaster({ ...base, lowDb: 15, airDb: -17 });
   const thinBright = suggestedMaster({ ...base, lowDb: 8, airDb: -10 });
-  assert.ok(heavyDark.lowShelfDb < 0 && thinBright.lowShelfDb > 1, `${heavyDark.lowShelfDb} / ${thinBright.lowShelfDb}`);
-  assert.ok(heavyDark.highShelfDb > 2 && thinBright.highShelfDb < 1, `${heavyDark.highShelfDb} / ${thinBright.highShelfDb}`);
+  assert.ok(heavyDark.eq.sub < 0 && thinBright.eq.sub > 1, `${heavyDark.eq.sub} / ${thinBright.eq.sub}`);
+  assert.ok(heavyDark.eq.air > 2 && thinBright.eq.air < 1, `${heavyDark.eq.air} / ${thinBright.eq.air}`);
   assert.ok(heavyDark.warmth < thinBright.warmth);
 });
 

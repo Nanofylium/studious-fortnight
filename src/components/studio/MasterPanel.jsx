@@ -3,6 +3,7 @@ import { Disc3, Loader2, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import EqPanel from './EqPanel';
 import MasterMeter from './MasterMeter';
 
 const CHAIN = ['De-metálico', 'Calor', 'Fita', 'Compressão', 'Largura', 'Limitador'];
@@ -198,7 +199,11 @@ export default function MasterPanel({
       <MasterMeter getAnalyser={getAnalyser} />
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        {[...(master.smartMix !== false ? smartChain(mixPlan) : []), ...CHAIN].map((step) => (
+        {[
+          ...(master.smartMix !== false ? smartChain(mixPlan) : []),
+          ...(master.eq && Object.values(master.eq).some(Boolean) ? ['Equalizador'] : []),
+          ...CHAIN,
+        ].map((step) => (
           <span
             key={step}
             className={`rounded-full border px-2 py-[3px] text-[9px] uppercase tracking-[0.12em] ${
@@ -248,6 +253,8 @@ export default function MasterPanel({
           onChange={(v) => onMaster({ tape: v })}
         />
       </div>
+
+      <EqPanel eq={master.eq} onChange={(eq) => onMaster({ eq })} />
 
       <div className="mt-5">
         <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Volume alvo</p>

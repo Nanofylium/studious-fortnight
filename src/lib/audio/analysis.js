@@ -111,8 +111,17 @@ export function suggestedMaster(mix) {
   return {
     deMetallic: clamp((0.3 + h * 0.62) * metalScale, 0.12, 0.9),
     warmth: clamp(0.5 - h * 0.22 - Math.max(0, lowExcess) * 0.08, 0.1, 0.6),
-    lowShelfDb: clamp(-lowExcess * 0.6, -2.5, 1.6),
-    highShelfDb: clamp(1.1 + dull * 0.5, 0, 3),
+    // The tonal moves go into the master EQ, where the user sees them and
+    // can change them; the fixed shelves of older sessions are turned off.
+    lowShelfDb: 0,
+    highShelfDb: 0,
+    eq: {
+      sub: Math.round(clamp(-lowExcess * 0.6, -2.5, 1.6) * 2) / 2,
+      low: 0,
+      mid: 0,
+      presence: 0,
+      air: Math.round(clamp(1.1 + dull * 0.5, 0, 3) * 2) / 2,
+    },
     width: h > 0.5 ? 1.05 : 1.18,
     // Tape comes in where the material is metallic and stays light when it is
     // already warm, so it always smooths rather than smears.

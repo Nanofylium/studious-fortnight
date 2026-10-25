@@ -1,6 +1,7 @@
 import { clamp, dbToGain, limitTruePeak, measure, saturationCurve, tapeCurve } from './dsp';
 import { integratedLufs } from './loudness';
 import { minimumPhaseFir } from './reference';
+import { EQ_BANDS, EQ_RANGE_DB } from './eq';
 import { ENV_RATE, roomImpulse } from './mixplan';
 
 // Plays a precomputed 0..1 envelope (see mixplan.js) as an audio-rate signal.
@@ -249,8 +250,20 @@ export function buildGraph(ctx, stems, params, options = {}) {
   mixBus.connect(glue);
   glue.connect(shelfLo);
   shelfLo.connect(shelfHi);
-  shelfHi.connect(matchDry);
-  shelfHi.connect(matchConv);
+  // The user's master EQ (eq.js), after the automatic shelves.
+  const eqNodes = EQ_BANDS.map((b) => {
+    const f = ctx.createBiquadFilter();
+    f.type = b.type;
+    f.frequency.value = b.freq;
+    f.Q.value = b.q;
+    f.gain.value = 0;
+    return f;
+  });
+  shelfHi.connect(eqNodes[0]);
+  for (let k = 1; k < eqNodes.length; k++) eqNodes[k - 1].connect(eqNodes[k]);
+  const eqOut = eqNodes[eqNodes.length - 1];
+  eqOut.connect(matchDry);
+  eqOut.connect(matchConv);
   matchConv.connect(matchWet);
   matchDry.connect(splitter);
   matchWet.connect(splitter);
@@ -275,6 +288,7 @@ export function buildGraph(ctx, stems, params, options = {}) {
       glue,
       shelfLo,
       shelfHi,
+      eqNodes,
       matchDry,
       matchWet,
       matchConv,
@@ -364,6 +378,9 @@ export function applyParams(graph, params, stems) {
   m.shelfLo.gain.value = bypass ? 0 : clamp(params.lowShelfDb ?? 1.6, -6, 6);
   m.shelfHi.gain.value = bypass ? 0 : clamp(params.highShelfDb ?? 1.1, -6, 6);
   m.sideWidth.gain.value = width;
+  EQ_BANDS.forEach((b, k) => {
+    m.eqNodes[k].gain.value = bypass ? 0 : clamp(params.eq?.[b.key] ?? 0, -EQ_RANGE_DB, EQ_RANGE_DB);
+  });
   m.sideHp.frequency.value = bypass ? 10 : 100;
 
   // The FIR is designed at the context's own rate, which can differ from the
