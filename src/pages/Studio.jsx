@@ -3,6 +3,7 @@ import { Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ChannelStrip from '@/components/studio/ChannelStrip';
 import MasterPanel from '@/components/studio/MasterPanel';
+import ProducePanel from '@/components/studio/ProducePanel';
 import ReportPanel from '@/components/studio/ReportPanel';
 import StemDropzone from '@/components/studio/StemDropzone';
 import StudioTopBar from '@/components/studio/StudioTopBar';
@@ -486,6 +487,7 @@ export default function Studio() {
                 rendering={exporting}
                 onRender={handleRender}
               />
+              <ProducePanel stems={stems} mixParams={mixParams} sessionName={sessionName} />
             </aside>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { truePeakDbtp } from './thirdparty/ebur128.js';
 // Pure DSP helpers — no Web Audio API dependency, safe to run anywhere.
 
 export const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -53,40 +54,19 @@ export function computePeaks(buffer, buckets = 420) {
 // enforce. 4x linear interpolation, the same detection practical limiters use.
 // Linear interpolation between two samples never exceeds the louder endpoint,
 // so windows whose endpoints both sit below the gate cannot hide a peak.
-export function truePeakDb(buffer, { gate = 0.1 } = {}) {
-  const n = buffer.length;
-  let max = 0;
-  for (let c = 0; c < buffer.numberOfChannels; c++) {
-    const d = buffer.getChannelData(c);
-    for (let i = 0; i < n; i++) {
-      const v = d[i];
-      const a = v < 0 ? -v : v;
-      if (a > max) max = a;
-      if (i === n - 1) break;
-      const nb = d[i + 1];
-      const b = nb < 0 ? -nb : nb;
-      if (a <= gate && b <= gate) continue;
-      const diff = nb - v;
-      let p = v + diff * 0.25;
-      if (p < 0) p = -p;
-      let m = p;
-      p = v + diff * 0.5;
-      if (p < 0) p = -p;
-      if (p > m) m = p;
-      p = v + diff * 0.75;
-      if (p < 0) p = -p;
-      if (p > m) m = p;
-      if (m > max) max = m;
-    }
-  }
-  return gainToDb(max);
+// True peak in dBTP, measured as libebur128 does it (4x polyphase
+// oversampling), so the number matches what streaming services measure.
+export function truePeakDb(buffer) {
+  const chans = [];
+  for (let c = 0; c < buffer.numberOfChannels; c++) chans.push(buffer.getChannelData(c));
+  return truePeakDbtp(chans, buffer.sampleRate);
 }
 
 // Look-ahead brickwall limiter with inter-sample-aware detection. The ceiling
 // holds on the samples and between them, and it does so independently of how
 // hard the level is pushed — which is what lets the loudness loop hit its
 // target without ever breaking the peak. In place.
-export function limitTruePeak(buffer, ceilingDb, { releaseMs = 120, lookMs = 2.5 } = {}) {
+function limitPass(buffer, ceilingDb, { releaseMs = 120, lookMs = 2.5 } = {}) {
   const n = buffer.length;
   const sr = buffer.sampleRate;
   const limit = dbToGain(ceilingDb);
@@ -127,6 +107,12 @@ export function limitTruePeak(buffer, ceilingDb, { releaseMs = 120, lookMs = 2.5
   const deque = new Int32Array(n + 2);
   let head = 0;
   let tail = 0;
+  // The window for sample 0 is [0, look]: seed it, or the first `look`
+  // samples would never be limited.
+  for (let j = 0; j < Math.min(look, n); j++) {
+    while (tail > head && need[deque[tail - 1]] >= need[j]) tail--;
+    deque[tail++] = j;
+  }
   for (let i = 0; i < n; i++) {
     const add = i + look;
     if (add < n) {
@@ -147,7 +133,20 @@ export function limitTruePeak(buffer, ceilingDb, { releaseMs = 120, lookMs = 2.5
     for (let c = 0; c < chans.length; c++) chans[c][i] *= g;
   }
 
-  return { grDb: -gainToDb(minG), truePeakDb: truePeakDb(buffer) };
+  return -gainToDb(minG);
+}
+
+// The pass above detects peaks by linear interpolation, which can miss a dB
+// or so of inter-sample overshoot in bright material. The result is checked
+// with the oversampled meter and limited again a little lower until it holds.
+export function limitTruePeak(buffer, ceilingDb, opts = {}) {
+  let grDb = limitPass(buffer, ceilingDb, opts);
+  let tp = truePeakDb(buffer);
+  for (let it = 0; it < 4 && tp > ceilingDb + 0.02; it++) {
+    grDb = Math.max(grDb, limitPass(buffer, ceilingDb - (tp - ceilingDb) - 0.02 * (it + 1), opts));
+    tp = truePeakDb(buffer);
+  }
+  return { grDb, truePeakDb: tp };
 }
 
 export function fftInPlace(re, im) {
