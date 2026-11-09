@@ -127,6 +127,12 @@ export function limitTruePeak(buffer, ceilingDb, { releaseMs = 120, lookMs = 2.5
   const deque = new Int32Array(n + 2);
   let head = 0;
   let tail = 0;
+  // The window for sample 0 is [0, look]: seed it, or the first `look`
+  // samples would never be limited.
+  for (let j = 0; j < Math.min(look, n); j++) {
+    while (tail > head && need[deque[tail - 1]] >= need[j]) tail--;
+    deque[tail++] = j;
+  }
   for (let i = 0; i < n; i++) {
     const add = i + look;
     if (add < n) {
