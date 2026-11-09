@@ -15,6 +15,7 @@ export const PRODUCE_DEFAULTS = {
   body: 1.5,
   clarity: true,
   analog: false,
+  clip: true,
   voiceMatch: 0.75,
   targetLufs: -14,
   ceilingDb: -1,
@@ -73,8 +74,9 @@ export function produceSong({ vocals = [], others = [], sampleRate: sr, referenc
   const mx = mixdown({ vocal, vocalTargetLufs, instrumental }, sr, { analog: o.analog });
   report.glueDb = round(mx.glueDb);
   onStage('master');
-  const m = masterTo(mx.channels, sr, { targetLufs: o.targetLufs, ceilingDb: o.ceilingDb });
+  const m = masterTo(mx.channels, sr, { targetLufs: o.targetLufs, ceilingDb: o.ceilingDb, clip: o.clip });
   report.lufs = round(m.lufs, 2);
   report.truePeakDb = round(m.truePeakDb, 2);
+  report.lra = round(m.lra, 1);
   return { channels: mx.channels, report };
 }

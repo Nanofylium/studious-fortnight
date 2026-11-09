@@ -203,9 +203,15 @@ export default function ProducePanel({ stems, mixParams, sessionName }) {
 
         <Toggle
           label="Analógico"
-          hint="Fita no bus: wow e flutter, grave encorpado, saturação suave e chiado baixinho."
+          hint="Fita no bus com o ToTape6 do Airwindows: flutter, grave encorpado, agudos suaves e saturação."
           checked={opts.analog}
           onChange={(v) => set({ analog: v })}
+        />
+        <Toggle
+          label="Clipper"
+          hint="ClipOnly2 do Airwindows antes do limitador: corta só os picos mais altos, o limitador bombeia menos."
+          checked={opts.clip}
+          onChange={(v) => set({ clip: v })}
         />
 
         <Button className="h-9 w-full gap-2 text-[12px]" disabled={busy || !active.length} onClick={run}>
@@ -218,8 +224,10 @@ export default function ProducePanel({ stems, mixParams, sessionName }) {
           <div className="rounded-2xl border border-hairline px-3 py-2.5 text-[11px] leading-relaxed">
             <p>
               Master: <span className="num">{report.lufs?.toFixed(1)} LUFS</span> ·{' '}
-              <span className="num">{report.truePeakDb?.toFixed(1)} dBTP</span>
+              <span className="num">{report.truePeakDb?.toFixed(1)} dBTP</span> ·{' '}
+              <span className="num">LRA {report.lra?.toFixed(1)} LU</span>
             </p>
+            <p className="text-muted-foreground">Medido no padrão EBU R128 (libebur128).</p>
             {report.vocal && (
               <p className="text-muted-foreground">
                 Metálico na voz: <span className="num">{report.vocal.metallicBefore}</span> →{' '}

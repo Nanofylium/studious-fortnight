@@ -1,46 +1,25 @@
 // Vocal bus + instrumental -> stereo mix -> streaming master (-14 LUFS
 // integrated, -1 dBTP). The vocal sits 1 dB above the loudness the separated
 // vocal had in the song; the instrumental gets a wide -1.5 dB pocket at
-// 2.8 kHz and a sub clean-up. Optional tape machine on the bus, then a slow
-// 2:1 glue and the loudness loop through the true-peak limiter.
+// 2.8 kHz and a sub clean-up. Optional tape machine on the bus (Airwindows
+// ToTape6), then a slow 2:1 glue and the loudness loop through the true-peak
+// limiter, optionally after the Airwindows ClipOnly2 clipper.
 import { dbToGain, limitTruePeak, truePeakDb } from '../dsp.js';
 import { integratedLufs } from '../loudness.js';
-import { asBuffer, bq, chain, filt, lcg, monoOf, percentile, readAt, scale } from './filters.js';
+import { asBuffer, bq, chain, lcg, monoOf, percentile, scale } from './filters.js';
+import { clipOnly2Aligned, toTape6 } from '../thirdparty/airwindows.js';
+import { loudnessRange } from '../thirdparty/ebur128.js';
 
 const lufsOf = (ch, sr) => integratedLufs(asBuffer(ch, sr));
 
-// Wow (0.55 Hz) and flutter (6.3 Hz) as a modulated delay, head bump, gentle
-// HF loss, soft asymmetric saturation, faint hiss and L/R crosstalk.
+// Tape machine on the bus: Airwindows ToTape6 (flutter, head bump, soft
+// highs, saturation), driven from a fixed level so the colour is the same
+// whatever the mix level, then a faint hiss and slight L/R crosstalk.
 export function analogStage(mix, sr) {
-  const L = mix[0].length;
-  const mod = new Float32Array(L);
-  for (let i = 0; i < L; i++) {
-    const t = i / sr;
-    mod[i] =
-      ((Math.sin(2 * Math.PI * 0.55 * t) * 0.00035) / (2 * Math.PI * 0.55) +
-        (Math.sin(2 * Math.PI * 6.3 * t) * 0.00015) / (2 * Math.PI * 6.3)) *
-      sr;
-  }
-  let y = mix.map((c) => {
-    const o = new Float32Array(L);
-    for (let i = 0; i < L; i++) o[i] = readAt(c, i + mod[i]);
-    return chain(o, [bq('peak', 65, 1.0, 1.2, sr), bq('peak', 130, 1.2, -0.4, sr), bq('hs', 14000, 0.7, -1.5, sr)]);
-  });
   let pk = 1e-9;
-  for (const c of y) for (let i = 0; i < L; i++) pk = Math.max(pk, Math.abs(c[i]));
-  const k = 1.4;
-  const hd = 1.8 * pk;
-  const sm = k / Math.tanh(k);
-  const dc = bq('hp', 12, 0.7, 0, sr);
-  y = y.map((c) =>
-    filt(
-      c.map((v) => {
-        const x = v / hd;
-        return ((Math.tanh(k * (x + 0.04 * x * x)) / Math.tanh(k)) / sm) * hd;
-      }),
-      dc,
-    ),
-  );
+  for (const c of mix) for (let i = 0; i < c.length; i++) pk = Math.max(pk, Math.abs(c[i]));
+  const drive = dbToGain(-6) / pk;
+  let y = toTape6(mix.map((c) => c.map((v) => v * drive)), sr);
   const rnd = lcg(11);
   const hg = dbToGain(-76) * 3;
   y = y.map((c) => {
@@ -50,7 +29,7 @@ export function analogStage(mix, sr) {
       b0 = 0.997 * b0 + 0.03 * w;
       b1 = 0.985 * b1 + 0.03 * w;
       b2 = 0.95 * b2 + 0.06 * w;
-      return v + (b0 + b1 + b2 + 0.1 * w) * hg;
+      return v / drive + (b0 + b1 + b2 + 0.1 * w) * hg;
     });
   });
   const xt = dbToGain(-30);
@@ -88,16 +67,25 @@ export function glue(mix, sr) {
 }
 
 // Loudness to the target through the true-peak limiter; iterated because
-// limiting takes a little loudness away. In place.
-export function masterTo(ch, sr, { targetLufs = -14, ceilingDb = -1 } = {}) {
+// limiting takes a little loudness away. With `clip`, Airwindows ClipOnly2
+// shaves the tallest transients first (overs more than 1.5 dB above the
+// ceiling), so the limiter works less and pumps less. In place.
+export function masterTo(ch, sr, { targetLufs = -14, ceilingDb = -1, clip = false } = {}) {
+  const k = 0.9549925859 / dbToGain(ceilingDb + 1.5);
   for (let it = 0; it < 5; it++) {
     const l = lufsOf(ch, sr);
     if (!Number.isFinite(l)) break;
     if (Math.abs(targetLufs - l) < 0.05 && it > 0) break;
     scale(ch, dbToGain(targetLufs - l));
+    if (clip) {
+      for (let c = 0; c < ch.length; c++) {
+        const y = clipOnly2Aligned(ch[c].map((v) => v * k), sr);
+        for (let i = 0; i < y.length; i++) ch[c][i] = y[i] / k;
+      }
+    }
     limitTruePeak(asBuffer(ch, sr), ceilingDb);
   }
-  return { lufs: lufsOf(ch, sr), truePeakDb: truePeakDb(asBuffer(ch, sr)) };
+  return { lufs: lufsOf(ch, sr), truePeakDb: truePeakDb(asBuffer(ch, sr)), lra: loudnessRange(ch, sr) };
 }
 
 export function mixdown({ vocal, vocalTargetLufs, instrumental }, sr, { analog = false } = {}) {

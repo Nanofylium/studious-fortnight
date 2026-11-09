@@ -1,3 +1,4 @@
+import { integratedLoudness } from './thirdparty/ebur128.js';
 // Simplified ITU-R BS.1770 loudness measurement (K-weighting + gated blocks).
 
 export function biquad(type, f0, q, gainDb, sampleRate) {
@@ -49,7 +50,10 @@ export function applyBiquad(d, { b0, b1, b2, a1, a2 }) {
   }
 }
 
-export function integratedLufs(buffer, { maxSeconds = 0, inPlace = false } = {}) {
+// Integrated loudness through the libebur128 port (exact BS.1770-4
+// K-weighting and gating). `maxSeconds` measures a centred excerpt; silence
+// reads as -70.
+export function integratedLufs(buffer, { maxSeconds = 0 } = {}) {
   const sr = buffer.sampleRate;
   const nch = Math.min(2, buffer.numberOfChannels);
   const total = buffer.length;
@@ -60,44 +64,11 @@ export function integratedLufs(buffer, { maxSeconds = 0, inPlace = false } = {})
     start = Math.floor((total - len) / 2);
   }
   if (len < Math.round(0.4 * sr)) return -70;
-
-  const full = start === 0 && len === total;
   const data = [];
   for (let c = 0; c < nch; c++) {
-    const src = buffer.getChannelData(c);
-    // inPlace only when the caller owns the samples (a throwaway mixdown)
-    data.push(inPlace && full ? src : src.slice(start, start + len));
+    const d = buffer.getChannelData(c);
+    data.push(start === 0 && len === total ? d : d.subarray(start, start + len));
   }
-
-  const shelf = biquad('highshelf', 1681.97, 0.7071, 4, sr);
-  const hp = biquad('highpass', 38.13, 0.5, 0, sr);
-  for (const d of data) {
-    applyBiquad(d, shelf);
-    applyBiquad(d, hp);
-  }
-
-  const blockLen = Math.round(0.4 * sr);
-  const hop = Math.round(0.1 * sr);
-  const z = [];
-  for (let s = 0; s + blockLen <= len; s += hop) {
-    let ms = 0;
-    for (let c = 0; c < nch; c++) {
-      const d = data[c];
-      let sum = 0;
-      for (let i = s; i < s + blockLen; i++) sum += d[i] * d[i];
-      ms += sum / blockLen;
-    }
-    z.push(ms);
-  }
-  if (!z.length) return -70;
-
-  const loud = z.map((v) => -0.691 + 10 * Math.log10(v + 1e-12));
-  const above = loud.filter((v) => v > -70);
-  if (!above.length) return -70;
-  const mean = above.reduce((a, b) => a + b, 0) / above.length;
-  const rel = mean - 10;
-  const kept = z.filter((_, i) => loud[i] > -70 && loud[i] > rel);
-  if (!kept.length) return -70;
-  const finalMean = kept.reduce((a, b) => a + b, 0) / kept.length;
-  return -0.691 + 10 * Math.log10(finalMean + 1e-12);
+  const l = integratedLoudness(data, sr);
+  return Number.isFinite(l) ? Math.max(-70, l) : -70;
 }
