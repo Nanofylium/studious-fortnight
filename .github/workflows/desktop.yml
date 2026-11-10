@@ -45,8 +45,8 @@ jobs:
       - run: npm test
       # The stem-separation model ships inside the installer (offline use).
       - run: node scripts/fetch-model.mjs
-      # The owner's full build first (Windows only): Produção completa, Voz DNA
-      # and Bloopers behind the passphrase. Kept as a run artifact, never put
+      # The owner's full build first (Windows only): Produção completa and
+      # Bloopers behind the passphrase. Kept as a run artifact, never put
       # on the public release.
       - if: runner.os == 'Windows'
         run: npm run build:desktop

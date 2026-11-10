@@ -1,12 +1,11 @@
 // "Produção completa": the offline chain that made the Spotify masters,
 // inside the app. Vocal stems are summed and go through the vocal chain
-// (optionally matched to a reference voice), the other stems are summed into
+// the other stems are summed into
 // the instrumental chain, and both are mixed and mastered to -14 LUFS / -1 dBTP.
 import { integratedLufs } from '../loudness.js';
 import { asBuffer, toStereo } from './filters.js';
 import { produceVocal } from './vocal.js';
 import { produceInstrumental } from './instrumental.js';
-import { applyVoiceMatch } from './voicematch.js';
 import { masterTo, mixdown } from './mixdown.js';
 import { metallicIndex } from './spectral.js';
 
@@ -16,7 +15,6 @@ export const PRODUCE_DEFAULTS = {
   clarity: true,
   analog: false,
   clip: true,
-  voiceMatch: 0.75,
   targetLufs: -14,
   ceilingDb: -1,
 };
@@ -37,9 +35,8 @@ function sumStems(list) {
 
 const round = (v, d = 1) => (Number.isFinite(v) ? Math.round(v * 10 ** d) / 10 ** d : null);
 
-// `vocals` and `others` are lists of channel arrays; `referenceLtas` is the
-// output of ltas() on a reference voice, or null.
-export function produceSong({ vocals = [], others = [], sampleRate: sr, referenceLtas = null }, options = {}, onStage = () => {}) {
+// `vocals` and `others` are lists of channel arrays.
+export function produceSong({ vocals = [], others = [], sampleRate: sr }, options = {}, onStage = () => {}) {
   const o = { ...PRODUCE_DEFAULTS, ...options };
   const report = {};
   const vocalSrc = sumStems(vocals);
@@ -55,12 +52,6 @@ export function produceSong({ vocals = [], others = [], sampleRate: sr, referenc
     const v = produceVocal(vocalSrc, sr, o);
     vocal = v.channels;
     report.vocal = { ...v.report, metallicBefore: round(metalBefore, 3) };
-    if (referenceLtas && o.voiceMatch > 0) {
-      onStage('dna');
-      const m = applyVoiceMatch(vocal, sr, referenceLtas, { strength: o.voiceMatch });
-      vocal = m.channels;
-      report.voiceMatch = m.curve;
-    }
     report.vocal.metallicAfter = round(metallicIndex(vocal, sr), 3);
   }
   let instrumental = null;

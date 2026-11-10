@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { SR, rng, song } from '../repair/test-signals.js';
 import { asBuffer, bq, filt, rms } from './filters.js';
 import { dynamicDemetal, metallicIndex } from './spectral.js';
-import { ltas, voiceMatchCurve, applyVoiceMatch } from './voicematch.js';
 import { encodeWav16Dither, masterTo } from './mixdown.js';
 import { produceSong } from './pipeline.js';
 import { integratedLufs } from '../loudness.js';
@@ -32,20 +31,6 @@ test('dynamic de-metal pulls a ringing partial out of noise and leaves plain noi
   assert.ok(bandRms(mid(out[0]), 5000) < bandRms(mid(ring), 5000) * 0.6);
 });
 
-test('voice match: identical spectra give a flat curve, a darker reference tilts it down in the highs', () => {
-  const x = white(4);
-  const flat = voiceMatchCurve(ltas([x]), ltas([x]), SR);
-  assert.ok(Math.max(...flat.map(Math.abs)) < 0.01);
-  const dark = filt(x, bq('hs', 3000, 0.7, -8, SR));
-  const curve = voiceMatchCurve(ltas([dark]), ltas([x]), SR, { strength: 1, limitDb: 6 });
-  const at = (hz) => curve[Math.round((hz * 8192) / SR)];
-  assert.ok(at(4500) < -3, `4.5 kHz ${at(4500).toFixed(2)}`);
-  assert.ok(at(9000) >= -2.001, 'HF cuts above 6 kHz are held to -2 dB');
-  assert.ok(Math.abs(at(300)) < 3.5, `300 Hz ${at(300).toFixed(2)}`);
-  const { channels } = applyVoiceMatch([x, x.slice()], SR, ltas([dark]), { strength: 1 });
-  assert.ok(Math.abs(rms(channels[0]) / rms(x) - 1) < 0.01, 'level kept');
-});
-
 test('master loop lands on -14 LUFS under -1 dBTP', () => {
   const s = song(8);
   const ch = [s.map((v) => v * 0.3), s.map((v) => v * 0.28)];
@@ -65,12 +50,10 @@ test('full production: vocal + instrumental to a streaming master', () => {
     for (let h = 1; h <= 12; h++) v += Math.sin(2 * Math.PI * 196 * h * t) / h;
     return on * (0.15 * v + 0.004 * (r() * 2 - 1));
   });
-  const reference = ltas([filt(white(4), bq('ls', 300, 0.7, 4, SR))]);
-  const out = produceSong({ vocals: [[voice]], others: [[inst, inst.slice()]], sampleRate: SR, referenceLtas: reference }, {});
+  const out = produceSong({ vocals: [[voice]], others: [[inst, inst.slice()]], sampleRate: SR }, {});
   assert.equal(out.channels.length, 2);
   assert.ok(Math.abs(out.report.lufs + 14) < 0.5, `lufs ${out.report.lufs}`);
   assert.ok(out.report.truePeakDb <= -0.9, `tp ${out.report.truePeakDb} lufs ${out.report.lufs}`);
-  assert.ok(out.report.voiceMatch, 'voice match ran');
   assert.ok(out.channels[0].every(Number.isFinite));
   const lufs = integratedLufs(asBuffer(out.channels, SR));
   assert.ok(Math.abs(lufs - out.report.lufs) < 0.05);
