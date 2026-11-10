@@ -22,7 +22,10 @@ Duas edições saem de cada build:
   `Forja-Windows-completo` da Action): tudo, com os recursos do dono trancados
   por senha.
 
-Link fixo do instalador público (sempre a última release):
+Link fixo do instalador público (sempre a última release). Para publicar
+uma versão: push de uma tag `v*`, ou rode o workflow **Desktop app** à mão
+com o campo *release* preenchido (ex.: `v0.1.1`).
+
 https://github.com/Nanofylium/studious-fortnight/releases/latest/download/Forja-Setup.exe
 
 Para rodar a partir do código:
