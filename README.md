@@ -4,6 +4,14 @@ Arraste os stems gerados no Suno (voz, bateria, baixo...) ou uma faixa pronta.
 O Forja repara estalos e buracos, tira o som metálico, mixa os stems e
 masteriza no volume certo. Todo o processamento roda na sua máquina.
 
+## Editar e gravar
+
+A aba **Editar e gravar** é um editor multipistas (waveform-playlist, MIT):
+os stems viram pistas, dá para mover, aparar, cortar (S), fazer fades,
+desfazer, e gravar a voz pelo microfone com o resto tocando (R). **Usar na
+mixagem** devolve as pistas como stems para a mixagem e o master do Forja.
+Numa sessão vazia, "grave sua voz do zero" abre o editor direto.
+
 ## App de desktop
 
 Instaladores prontos: aba **Actions** do GitHub, workflow **Desktop app**,

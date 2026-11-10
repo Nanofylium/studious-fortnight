@@ -16,11 +16,16 @@ import { planMix } from '@/lib/audio/mixplan';
 import { StudioEngine } from '@/lib/audio/engine';
 import { loadStemFiles, pickStemFiles, stemFromChannels } from '@/lib/audio/loader';
 import { separateBuffer } from '@/lib/audio/separate/client';
+import { renderTracks } from '@/lib/audio/daw/render';
+import { tracksFromStems } from '@/lib/audio/daw/tracks';
 import { isUnlocked, setUnlocked } from '@/lib/audio/bloopers/gate';
 import { PUBLIC_EDITION } from '@/lib/edition';
 
 // Owner mode: the full production chain and the Bloopers room, each a separate
 // chunk loaded only after the passphrase. The public build has neither.
+// The editor pulls in waveform-playlist and Tone.js: its own chunk, loaded
+// when the view is opened.
+const DawView = lazy(() => import('@/components/studio/DawView'));
 const OwnerPanels = PUBLIC_EDITION ? null : lazy(() => import('@/components/studio/OwnerPanels'));
 const BloopersGate = PUBLIC_EDITION ? null : lazy(() => import('@/components/studio/BloopersGate'));
 
@@ -99,6 +104,34 @@ export default function Studio() {
     return slug || 'forja-sessao';
   }, [stems]);
 
+  // A new set of stems for the session: colours, auto mix, measurements and
+  // the suggested master.
+  const adoptStems = useCallback((list) => {
+    const next = list.map((s, i) => ({ ...s, color: STEM_COLORS[i % STEM_COLORS.length] }));
+    const levels = autoMix(next);
+    const summary = summarizeMix(next);
+    // Unity gain = exactly what the delivered files contain. A single file is
+    // measured in full, so the loudness verdict on it is exact.
+    const originalLufs = excerptMixLufs(next, unityMix(next), next.length === 1 ? 0 : 40);
+    const sessionLufs = excerptMixLufs(next, levels, 40);
+
+    setStems(next);
+    setMixParams(levels);
+    setBaseline({
+      lufs: originalLufs,
+      sessionLufs,
+      peakDb: summary.truePeakDb ?? summary.peakDb,
+      harshness: summary.harshness,
+      crest: (summary.truePeakDb ?? summary.peakDb) - summary.rmsDb,
+    });
+    setAfter(null);
+    setMaster((m) => ({
+      ...m,
+      ...suggestedMaster(summary),
+      makeupDb: clamp(m.targetLufs - sessionLufs, -12, 16),
+    }));
+  }, []);
+
   const handleFiles = useCallback(
     async (fileList) => {
       if (!fileList || !fileList.length) return;
@@ -134,36 +167,55 @@ export default function Studio() {
             setError('Não deu para separar em stems nesta máquina; masterizando a faixa inteira.');
           }
         }
-        const next = [...stems, ...loaded].map((s, i) => ({ ...s, color: STEM_COLORS[i % STEM_COLORS.length] }));
-        const levels = autoMix(next);
-        const summary = summarizeMix(next);
-        // Unity gain = exactly what the delivered files contain. A single file is
-        // measured in full, so the loudness verdict on it is exact.
-        const originalLufs = excerptMixLufs(next, unityMix(next), next.length === 1 ? 0 : 40);
-        const sessionLufs = excerptMixLufs(next, levels, 40);
-
-        setStems(next);
-        setMixParams(levels);
-        setBaseline({
-          lufs: originalLufs,
-          sessionLufs,
-          peakDb: summary.truePeakDb ?? summary.peakDb,
-          harshness: summary.harshness,
-          crest: (summary.truePeakDb ?? summary.peakDb) - summary.rmsDb,
-        });
-        setAfter(null);
-        setMaster((m) => ({
-          ...m,
-          ...suggestedMaster(summary),
-          makeupDb: clamp(m.targetLufs - sessionLufs, -12, 16),
-        }));
+        adoptStems([...stems, ...loaded]);
       } catch (e) {
         setError(`Não foi possível processar o arquivo. ${e?.message || ''}`.trim());
       } finally {
         setBusy(null);
       }
     },
-    [stems],
+    [stems, adoptStems],
+  );
+
+  // Editor (DAW) view: its tracks live here so switching views keeps edits.
+  // They are rebuilt from the stems whenever the session's stems change.
+  const [view, setView] = useState('mix');
+  const [dawTracks, setDawTracks] = useState(null);
+  const [applying, setApplying] = useState(false);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  useEffect(() => setDawTracks(viewRef.current === 'daw' ? tracksFromStems(stems) : null), [stems]);
+  const openDaw = useCallback(() => {
+    engineRef.current?.stop();
+    setPlaying(false);
+    setDawTracks((t) => t ?? tracksFromStems(stems));
+    setView('daw');
+  }, [stems]);
+
+  // "Usar na mixagem": the edited tracks become the session's stems. Tracks
+  // that came from a stem keep its name and role; recorded ones are vocals.
+  const handleApplyDaw = useCallback(
+    async (tracks) => {
+      setApplying(true);
+      try {
+        await new Promise((r) => setTimeout(r, 20));
+        const rendered = renderTracks(tracks, sampleRate);
+        if (!rendered.length) throw new Error('nenhuma pista com áudio');
+        const byId = new Map(stems.map((s) => [s.id, s]));
+        const list = rendered.map(({ track, channels }, i) => {
+          const old = byId.get(track.id);
+          const stem = stemFromChannels(channels, sampleRate, track.name, { index: i, repair: old?.repair ?? null });
+          return old ? { ...stem, id: old.id, name: old.name, role: old.role } : stem;
+        });
+        adoptStems(list);
+        setView('mix');
+      } catch (e) {
+        setError(`Não deu para levar as pistas para a mixagem. ${e?.message || ''}`.trim());
+      } finally {
+        setApplying(false);
+      }
+    },
+    [stems, sampleRate, adoptStems],
   );
 
   useEffect(() => {
@@ -246,7 +298,7 @@ export default function Studio() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.code !== 'Space' || !stems.length) return;
+      if (e.code !== 'Space' || !stems.length || viewRef.current !== 'mix') return;
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
       e.preventDefault();
@@ -440,8 +492,47 @@ export default function Studio() {
         </Suspense>
       )}
 
-      {stems.length === 0 ? (
-        <StemDropzone onFiles={handleFiles} busy={busy} error={error} />
+      {(stems.length > 0 || view === 'daw') && (
+        <div className="mx-auto flex w-full max-w-[1680px] items-center gap-1 px-4 pt-4 lg:px-8">
+          {[
+            ['mix', 'Mixagem e master'],
+            ['daw', 'Editar e gravar'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => (key === 'daw' ? openDaw() : setView('mix'))}
+              className={`rounded-full px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] transition-colors ${
+                view === key ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {view === 'daw' ? (
+        <div className="mx-auto w-full max-w-[1680px] px-4 pt-4 lg:px-8">
+          <Suspense
+            fallback={
+              <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Abrindo o editor…
+              </p>
+            }
+          >
+            <DawView
+              tracks={dawTracks || []}
+              setTracks={setDawTracks}
+              sampleRate={sampleRate}
+              onApply={handleApplyDaw}
+              applying={applying}
+            />
+          </Suspense>
+          {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
+        </div>
+      ) : stems.length === 0 ? (
+        <StemDropzone onFiles={handleFiles} busy={busy} error={error} onRecord={openDaw} />
       ) : (
         <div className="mx-auto w-full max-w-[1680px] px-4 pt-6 lg:px-8">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_370px]">
@@ -539,7 +630,7 @@ export default function Studio() {
         </div>
       )}
 
-      {stems.length > 0 && (
+      {stems.length > 0 && view === 'mix' && (
         <Transport
           playing={playing}
           position={position}

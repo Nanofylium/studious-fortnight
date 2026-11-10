@@ -1,7 +1,7 @@
 // Forja desktop: the same app as the web build, in its own window. All audio
 // processing already runs locally (Web Audio + a Web Worker), so the shell
 // only serves the built files and handles windows and saving.
-const { app, BrowserWindow, dialog, protocol, net, shell } = require('electron');
+const { app, BrowserWindow, dialog, protocol, net, session, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -86,7 +86,18 @@ function createWindow() {
   return win;
 }
 
+// The editor records the voice: the app's own pages may use the microphone
+// (and nothing else that asks for a permission); other origins get nothing.
+function allowMicOnly() {
+  const ours = (url) => String(url || '').startsWith('app://');
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb, details) =>
+    cb(permission === 'media' && ours(details.requestingUrl) && !(details.mediaTypes || []).includes('video')),
+  );
+  session.defaultSession.setPermissionCheckHandler((wc, permission, origin) => permission === 'media' && ours(origin));
+}
+
 app.whenReady().then(() => {
+  allowMicOnly();
   serveDist();
   createWindow();
   app.on('activate', () => {

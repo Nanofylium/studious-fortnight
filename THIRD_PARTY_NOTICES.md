@@ -57,3 +57,22 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Editor (npm packages)
+
+The "Editar e gravar" view uses these packages unmodified, bundled from npm
+into the editor's own chunk:
+
+- waveform-playlist (`@waveform-playlist/browser`, `core`, `playout`,
+  `recording`, `ui-components`, `engine`, `worklets`): MIT,
+  https://github.com/naomiaro/waveform-playlist
+- Tone.js (`tone`): MIT, https://github.com/Tonejs/Tone.js
+- dnd kit (`@dnd-kit/*`): MIT, https://github.com/clauderic/dnd-kit
+- styled-components: MIT, https://github.com/styled-components/styled-components
+- waveform-data (dependency of waveform-playlist): **LGPL-3.0**,
+  https://github.com/bbc/waveform-data.js. Used unmodified as a separate
+  module; its source is at that address and Forja's own source is public, so
+  the library can be replaced and the app rebuilt (LGPL-3.0 section 4).
+  Full license text: `node_modules/waveform-data/LICENSE` after `npm install`.
+
+Their full license texts ship inside each package in `node_modules/`.
