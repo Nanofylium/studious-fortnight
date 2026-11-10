@@ -76,3 +76,15 @@ into the editor's own chunk:
   Full license text: `node_modules/waveform-data/LICENSE` after `npm install`.
 
 Their full license texts ship inside each package in `node_modules/`.
+
+## RVC (Minha voz, owner edition only)
+
+`src/lib/audio/rvc/` reimplements in JavaScript the inference pipeline of
+Retrieval-based Voice Conversion (RVC-Project,
+https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI, MIT),
+and `scripts/rvc/exportar_onnx.py` uses the model classes of its `rvc`
+package (MIT) to export a voice model to ONNX. No model weights are in this
+repository or in either installer. The base networks the user loads,
+HuBERT/ContentVec and RMVPE, come from
+https://huggingface.co/lj1995/VoiceConversionWebUI (MIT). Training is done
+with Applio (https://github.com/IAHispano/Applio, MIT).

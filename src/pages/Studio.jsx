@@ -177,6 +177,17 @@ export default function Studio() {
     [stems, adoptStems],
   );
 
+  // A stem made from another (owner tools): joins the session and, with
+  // `mute`, the stem it replaces is muted so the two can be compared.
+  const handleAddStem = useCallback(
+    ({ channels, sampleRate: sr, name, role, mute }) => {
+      const stem = stemFromChannels(channels, sr, name, { index: stems.length });
+      adoptStems([...stems, { ...stem, role: role ?? stem.role }]);
+      if (mute) setMixParams((p) => ({ ...p, [mute]: { ...p[mute], muted: true } }));
+    },
+    [stems, adoptStems],
+  );
+
   // Editor (DAW) view: its tracks live here so switching views keeps edits.
   // They are rebuilt from the stems whenever the session's stems change.
   const [view, setView] = useState('mix');
@@ -622,7 +633,13 @@ export default function Studio() {
               />
               {OwnerPanels && owner && (
                 <Suspense fallback={null}>
-                  <OwnerPanels stems={stems} mixParams={mixParams} sessionName={sessionName} onLock={handleLock} />
+                  <OwnerPanels
+                    stems={stems}
+                    mixParams={mixParams}
+                    sessionName={sessionName}
+                    onLock={handleLock}
+                    onAddStem={handleAddStem}
+                  />
                 </Suspense>
               )}
             </aside>

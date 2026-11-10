@@ -28,7 +28,8 @@ Duas edições saem de cada build:
   por IA, EQ, referência e master. Os recursos do dono não estão nela.
 - **Completa** (`Forja-Completo-Setup.exe`, só como artifact
   `Forja-Windows-completo` da Action): tudo, com os recursos do dono trancados
-  por senha.
+  por senha (Minha voz com RVC, Produção completa e Bloopers). O roteiro do
+  RVC, do treino ao uso, está em `scripts/rvc/LEIA-ME.md`.
 
 Link fixo do instalador público (sempre a última release). Para publicar
 uma versão: push de uma tag `v*`, ou rode o workflow **Desktop app** à mão
