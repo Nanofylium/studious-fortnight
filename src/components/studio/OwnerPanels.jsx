@@ -1,0 +1,15 @@
+import React from 'react';
+import BloopersPanel from '@/components/studio/BloopersPanel';
+import ProducePanel from '@/components/studio/ProducePanel';
+
+// The owner's tools: the full production chain (with voice DNA) and the
+// Bloopers room. Loaded as its own chunk, only after the passphrase, and
+// absent from the public build.
+export default function OwnerPanels({ stems, mixParams, sessionName, onLock }) {
+  return (
+    <>
+      <ProducePanel stems={stems} mixParams={mixParams} sessionName={sessionName} />
+      <BloopersPanel stems={stems} mixParams={mixParams} sessionName={sessionName} onLock={onLock} />
+    </>
+  );
+}

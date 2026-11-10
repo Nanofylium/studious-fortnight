@@ -15,8 +15,10 @@
     "preview": "vite preview",
     "test": "node --test 'src/lib/audio/**/*.test.js'",
     "build:desktop": "vite build --mode desktop",
+    "build:desktop:public": "vite build --mode desktop-public",
     "desktop": "vite build --mode desktop && electron .",
-    "dist:desktop": "vite build --mode desktop && electron-builder --publish never"
+    "dist:desktop": "vite build --mode desktop && electron-builder --publish never",
+    "dist:desktop:public": "vite build --mode desktop-public && electron-builder --publish never"
   },
   "dependencies": {
     "@audio/neural-separate": "^0.7.0",
@@ -126,7 +128,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "Forja-Setup-${version}.${ext}"
+      "artifactName": "Forja-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -137,14 +139,14 @@
         "dmg"
       ],
       "category": "public.app-category.music",
-      "artifactName": "Forja-${version}-${arch}.${ext}"
+      "artifactName": "Forja-${arch}.${ext}"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
       "category": "Audio",
-      "artifactName": "Forja-${version}.${ext}",
+      "artifactName": "Forja.${ext}",
       "executableName": "forja",
       "syncDesktopName": true
     }

@@ -40,7 +40,28 @@ jobs:
       - run: npm test
       # The stem-separation model ships inside the installer (offline use).
       - run: node scripts/fetch-model.mjs
-      - run: npm run build:desktop
+      # The owner's full build first (Windows only): Produção completa, Voz DNA
+      # and Bloopers behind the passphrase. Kept as a run artifact, never put
+      # on the public release.
+      - if: runner.os == 'Windows'
+        run: npm run build:desktop
+      - if: runner.os == 'Windows'
+        shell: bash
+        run: npx electron-builder --win --publish never '-c.win.artifactName=Forja-Completo-Setup.${ext}'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Forja-Windows-completo
+          path: release/Forja-Completo-Setup.exe
+          if-no-files-found: error
+      - if: runner.os == 'Windows'
+        shell: bash
+        run: rm -rf release dist
+      # The public build: the installer linked from the artist's website. The
+      # owner-only tools are not in it at all.
+      - run: npm run build:desktop:public
       - run: npx electron-builder ${{ matrix.target }} --publish never
         env:
           # Unsigned builds: no certificates are configured.
@@ -50,6 +71,9 @@ jobs:
           name: Forja-${{ runner.os }}
           path: ${{ matrix.files }}
           if-no-files-found: error
+      # A tag publishes the public installers on a release. Their names carry
+      # no version, so .../releases/latest/download/Forja-Setup.exe always
+      # points at the newest one (that is the link on the website).
       - if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:

@@ -3,8 +3,6 @@ import { Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ChannelStrip from '@/components/studio/ChannelStrip';
 import MasterPanel from '@/components/studio/MasterPanel';
-import BloopersGate from '@/components/studio/BloopersGate';
-import ProducePanel from '@/components/studio/ProducePanel';
 import ReportPanel from '@/components/studio/ReportPanel';
 import StemDropzone from '@/components/studio/StemDropzone';
 import StudioTopBar from '@/components/studio/StudioTopBar';
@@ -19,9 +17,12 @@ import { StudioEngine } from '@/lib/audio/engine';
 import { loadStemFiles, pickStemFiles, stemFromChannels } from '@/lib/audio/loader';
 import { separateBuffer } from '@/lib/audio/separate/client';
 import { isUnlocked, setUnlocked } from '@/lib/audio/bloopers/gate';
+import { PUBLIC_EDITION } from '@/lib/edition';
 
-// Hidden room: its code is a separate chunk, loaded only after the passphrase.
-const BloopersPanel = lazy(() => import('@/components/studio/BloopersPanel'));
+// Owner mode: the full production chain and the Bloopers room, each a separate
+// chunk loaded only after the passphrase. The public build has neither.
+const OwnerPanels = PUBLIC_EDITION ? null : lazy(() => import('@/components/studio/OwnerPanels'));
+const BloopersGate = PUBLIC_EDITION ? null : lazy(() => import('@/components/studio/BloopersGate'));
 
 const STEM_COLORS = [
   '#f59e0b', '#38bdf8', '#a78bfa', '#34d399', '#fb7185', '#facc15',
@@ -56,7 +57,7 @@ export default function Studio() {
   // Reference track: the full-strength match curve and how much of it to use.
   const [reference, setReference] = useState(null);
   const [referenceBusy, setReferenceBusy] = useState(false);
-  const [bloopers, setBloopers] = useState(isUnlocked);
+  const [owner, setOwner] = useState(() => !PUBLIC_EDITION && isUnlocked());
   const [gateOpen, setGateOpen] = useState(false);
 
   const engineRef = useRef(null);
@@ -260,29 +261,30 @@ export default function Studio() {
 
   // Ctrl+Alt+B (Cmd+Option+B on a Mac) also opens the locked door.
   useEffect(() => {
+    if (PUBLIC_EDITION) return undefined;
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyB') {
         e.preventDefault();
-        if (!bloopers) setGateOpen(true);
+        if (!owner) setGateOpen(true);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [bloopers]);
+  }, [owner]);
 
   const handleSecret = useCallback(() => {
-    if (!bloopers) setGateOpen(true);
-  }, [bloopers]);
+    if (!PUBLIC_EDITION && !owner) setGateOpen(true);
+  }, [owner]);
 
   const handleUnlock = useCallback(() => {
     setUnlocked(true);
-    setBloopers(true);
+    setOwner(true);
     setGateOpen(false);
   }, []);
 
   const handleLock = useCallback(() => {
     setUnlocked(false);
-    setBloopers(false);
+    setOwner(false);
   }, []);
 
   const handleMasterPatch = useCallback((patch) => {
@@ -432,7 +434,11 @@ export default function Studio() {
         onClear={handleClear}
         onSecret={handleSecret}
       />
-      <BloopersGate open={gateOpen} onOpenChange={setGateOpen} onUnlock={handleUnlock} />
+      {BloopersGate && gateOpen && (
+        <Suspense fallback={null}>
+          <BloopersGate open={gateOpen} onOpenChange={setGateOpen} onUnlock={handleUnlock} />
+        </Suspense>
+      )}
 
       {stems.length === 0 ? (
         <StemDropzone onFiles={handleFiles} busy={busy} error={error} />
@@ -523,10 +529,9 @@ export default function Studio() {
                 rendering={exporting}
                 onRender={handleRender}
               />
-              <ProducePanel stems={stems} mixParams={mixParams} sessionName={sessionName} />
-              {bloopers && (
+              {OwnerPanels && owner && (
                 <Suspense fallback={null}>
-                  <BloopersPanel stems={stems} mixParams={mixParams} sessionName={sessionName} onLock={handleLock} />
+                  <OwnerPanels stems={stems} mixParams={mixParams} sessionName={sessionName} onLock={handleLock} />
                 </Suspense>
               )}
             </aside>

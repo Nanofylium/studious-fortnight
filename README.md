@@ -14,12 +14,24 @@ Os builds não são assinados. No Windows, clique em "Mais informações" e
 "Executar assim mesmo"; no macOS, clique com o botão direito no app e
 escolha "Abrir" na primeira vez.
 
+Duas edições saem de cada build:
+
+- **Pública** (`Forja-Setup.exe`, a do site do artista): reparo, mix, separação
+  por IA, EQ, referência e master. Os recursos do dono não estão nela.
+- **Completa** (`Forja-Completo-Setup.exe`, só como artifact
+  `Forja-Windows-completo` da Action): tudo, com os recursos do dono trancados
+  por senha.
+
+Link fixo do instalador público (sempre a última release):
+https://github.com/Nanofylium/studious-fortnight/releases/latest/download/Forja-Setup.exe
+
 Para rodar a partir do código:
 
 ```bash
 npm install
 npm run desktop        # gera o build e abre a janela
 npm run dist:desktop   # gera o instalador do seu sistema em release/
+npm run dist:desktop:public   # o mesmo, edição pública
 ```
 
 ## Web (Base44)
