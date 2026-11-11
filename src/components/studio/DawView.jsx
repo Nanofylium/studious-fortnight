@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   Circle,
+  Download,
   Loader2,
   Mic,
   Pause,
@@ -33,6 +34,8 @@ import { createTrack } from '@waveform-playlist/core';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
 import { SegmentedVUMeter, darkTheme } from '@waveform-playlist/ui-components';
 import { Button } from '@/components/ui/button';
+import { encodeWav } from '@/lib/audio/dsp';
+import { renderTrack, trackEnd } from '@/lib/audio/daw/render';
 
 // Forja colours on the library's dark theme.
 const THEME = {
@@ -75,6 +78,28 @@ function Tool({ label, onClick, disabled, active, children, className = '' }) {
 }
 
 const Divider = () => <span className="mx-1 h-6 w-px bg-white/10" />;
+
+// Each recorded take as its own WAV, from the session's start, so it lines
+// up with the song when opened anywhere else.
+function downloadTakes(tracks, sr) {
+  tracks
+    .filter((t) => /^Voz gravada/.test(t.name) && t.clips.length)
+    .forEach((t, i) => {
+      const length = trackEnd(t);
+      const channels = renderTrack({ ...t, volume: 1, pan: 0 }, sr, length);
+      const wav = encodeWav({ numberOfChannels: 1, length, sampleRate: sr, getChannelData: () => channels[0] });
+      const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${t.name}.wav`;
+      setTimeout(() => {
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }, i * 400);
+    });
+}
 
 function Editor({ tracks, setTracks, selectedTrackId, setSelectedTrackId, onApply, applying }) {
   const { currentTimeRef, isPlaying, currentTime } = usePlaybackAnimation();
@@ -284,6 +309,18 @@ function Editor({ tracks, setTracks, selectedTrackId, setSelectedTrackId, onAppl
                 </option>
               ))}
             </select>
+          )}
+          {tracks.some((t) => /^Voz gravada/.test(t.name)) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-[11px]"
+              onClick={() => downloadTakes(tracks, sampleRate)}
+              disabled={busy}
+              title="Cada gravação como WAV, alinhada com o início da música"
+            >
+              <Download className="h-3.5 w-3.5" /> Baixar gravações
+            </Button>
           )}
           <Button size="sm" className="h-8 gap-1.5 text-[11px]" onClick={onApply} disabled={busy || applying}>
             {applying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
