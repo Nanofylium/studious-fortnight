@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Download, Fingerprint, Loader2, Wand2, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Loader2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -11,7 +11,6 @@ import { produceStems } from '@/lib/audio/produce/client';
 
 const STAGES = {
   voz: 'Tratando a voz',
-  dna: 'Aplicando a voz DNA',
   instrumental: 'Tratando o instrumental',
   mix: 'Mixando',
   master: 'Masterizando',
@@ -53,32 +52,17 @@ function download(data, name) {
 }
 
 // "Produção completa": the chain that made the Spotify masters (voice and
-// instrumental treatment, voice DNA, analog bus, -14 LUFS), run on the
+// instrumental treatment, analog bus, -14 LUFS), run on the
 // session's stems and delivered as two files ready for the distributor.
 export default function ProducePanel({ stems, mixParams, sessionName }) {
   const [opts, setOpts] = useState(PRODUCE_DEFAULTS);
-  const [voice, setVoice] = useState(null);
   const [stage, setStage] = useState(null);
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
-  const inputRef = useRef(null);
   const set = (patch) => setOpts((o) => ({ ...o, ...patch }));
 
   const active = stems.filter((s) => !mixParams[s.id]?.muted);
   const hasVocal = active.some((s) => s.role?.key === 'vocals');
-
-  const pickVoice = async (file) => {
-    if (!file) return;
-    setError(null);
-    try {
-      const ctx = new OfflineAudioContext(2, 1, stems[0]?.sampleRate || 44100);
-      const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
-      if (buffer.duration < 3) throw new Error('a referência precisa de pelo menos 3 segundos de voz');
-      setVoice({ name: file.name.replace(/\.[^.]+$/, ''), buffer });
-    } catch (e) {
-      setError(`Não deu para usar essa voz. ${e?.message || ''}`.trim());
-    }
-  };
 
   const run = async () => {
     if (!active.length) return;
@@ -87,7 +71,6 @@ export default function ProducePanel({ stems, mixParams, sessionName }) {
     setStage('voz');
     try {
       const { channels, report: r } = await produceStems(active, {
-        reference: hasVocal ? voice?.buffer : null,
         options: opts,
         onStage: setStage,
       });
@@ -140,60 +123,6 @@ export default function ProducePanel({ stems, mixParams, sessionName }) {
               checked={opts.clarity}
               onChange={(v) => set({ clarity: v })}
             />
-
-            <div className="rounded-2xl border border-hairline px-3 py-2.5">
-              <input
-                ref={inputRef}
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={(e) => {
-                  pickVoice(e.target.files?.[0]);
-                  e.target.value = '';
-                }}
-              />
-              {!voice ? (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-medium">Voz DNA</p>
-                    <p className="text-[10px] leading-snug text-muted-foreground">
-                      Suba uma acapella seca de um cantor que você gosta: a voz ganha o timbre dela.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 shrink-0 gap-1.5 text-[11px]"
-                    onClick={() => inputRef.current?.click()}
-                  >
-                    <Fingerprint className="h-3.5 w-3.5" /> Escolher
-                  </Button>
-                </div>
-              ) : (
-                <div>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Fingerprint className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <p className="truncate text-[12px] font-medium" title={voice.name}>
-                        {voice.name}
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setVoice(null)} aria-label="Remover voz DNA">
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <Row
-                    label="Igualar voz"
-                    value={opts.voiceMatch}
-                    display={`${Math.round(opts.voiceMatch * 100)}%`}
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    onChange={(v) => set({ voiceMatch: v })}
-                  />
-                </div>
-              )}
-            </div>
           </>
         ) : (
           <p className="text-[10px] leading-snug text-muted-foreground">

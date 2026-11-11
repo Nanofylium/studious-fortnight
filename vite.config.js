@@ -7,10 +7,24 @@ import { defineConfig } from 'vite'
 export default defineConfig(({ mode }) => {
   // `vite build --mode desktop` is the offline Electron build: no Base44
   // plugin (analytics, editor hooks, backend), output in dist/.
-  if (mode === 'desktop') {
+  // `desktop-public` is the same build without the owner-only tools: the
+  // installer offered on the artist's website (src/lib/edition.js).
+  if (mode === 'desktop' || mode === 'desktop-public') {
     return {
       plugins: [react()],
-      resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+      define: { 'import.meta.env.VITE_EDITION': JSON.stringify(mode === 'desktop-public' ? 'public' : 'full') },
+      resolve: {
+        alias: [
+          // Public build: the owner-only modules become an empty stub.
+          ...(mode === 'desktop-public'
+            ? ['OwnerPanels', 'BloopersGate', 'BloopersPanel', 'ProducePanel'].map((name) => ({
+                find: `@/components/studio/${name}`,
+                replacement: fileURLToPath(new URL('./src/components/studio/OwnerStub.jsx', import.meta.url)),
+              }))
+            : []),
+          { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+        ],
+      },
     }
   }
   return {

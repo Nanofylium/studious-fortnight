@@ -15,13 +15,18 @@
     "preview": "vite preview",
     "test": "node --test 'src/lib/audio/**/*.test.js'",
     "build:desktop": "vite build --mode desktop",
+    "build:desktop:public": "vite build --mode desktop-public",
     "desktop": "vite build --mode desktop && electron .",
-    "dist:desktop": "vite build --mode desktop && electron-builder --publish never"
+    "dist:desktop": "vite build --mode desktop && electron-builder --publish never",
+    "dist:desktop:public": "vite build --mode desktop-public && electron-builder --publish never"
   },
   "dependencies": {
     "@audio/neural-separate": "^0.7.0",
     "@base44/sdk": "^0.8.57",
     "@base44/vite-plugin": "^1.0.47",
+    "@dnd-kit/abstract": "^0.5.3",
+    "@dnd-kit/dom": "^0.5.3",
+    "@dnd-kit/react": "^0.5.3",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",
@@ -54,6 +59,11 @@
     "@stripe/react-stripe-js": "^3.0.0",
     "@stripe/stripe-js": "^5.2.0",
     "@tanstack/react-query": "^5.84.1",
+    "@waveform-playlist/browser": "^16.0.1",
+    "@waveform-playlist/core": "^12.6.2",
+    "@waveform-playlist/playout": "^12.5.5",
+    "@waveform-playlist/recording": "^13.0.6",
+    "@waveform-playlist/ui-components": "^14.0.1",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -81,9 +91,11 @@
     "react-router-dom": "^7.18.4",
     "recharts": "^2.15.4",
     "sonner": "^2.0.1",
+    "styled-components": "^6.6.0",
     "tailwind-merge": "^3.0.2",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.171.0",
+    "tone": "^15.1.22",
     "vaul": "^1.1.2",
     "zod": "^3.24.2"
   },
@@ -126,7 +138,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "Forja-Setup-${version}.${ext}"
+      "artifactName": "Forja-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -137,14 +149,17 @@
         "dmg"
       ],
       "category": "public.app-category.music",
-      "artifactName": "Forja-${version}-${arch}.${ext}"
+      "artifactName": "Forja-${arch}.${ext}",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "O Forja usa o microfone para gravar a sua voz no editor."
+      }
     },
     "linux": {
       "target": [
         "AppImage"
       ],
       "category": "Audio",
-      "artifactName": "Forja-${version}.${ext}",
+      "artifactName": "Forja.${ext}",
       "executableName": "forja",
       "syncDesktopName": true
     }

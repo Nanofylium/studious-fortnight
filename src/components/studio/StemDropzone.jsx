@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, Music, Sliders, Upload, Waves, Zap } from 'lucide-react';
+import { Loader2, Mic, Music, Sliders, Upload, Waves, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -9,7 +9,7 @@ const CHIPS = [
   { icon: Music, title: 'Master para release', text: 'Limitador e volume alvo de streaming, pronto para subir.' },
 ];
 
-export default function StemDropzone({ onFiles, busy, error }) {
+export default function StemDropzone({ onFiles, busy, error, onRecord }) {
   const inputRef = useRef(null);
   const [over, setOver] = useState(false);
 
@@ -49,6 +49,15 @@ export default function StemDropzone({ onFiles, busy, error }) {
         </Button>
 
         <p className="num mt-4 text-[11px] text-muted-foreground">WAV · MP3 · FLAC · M4A — até 12 stems</p>
+        {onRecord && (
+          <button
+            type="button"
+            onClick={onRecord}
+            className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            <Mic className="h-3.5 w-3.5" /> ou grave sua voz do zero no editor
+          </button>
+        )}
 
         <input
           ref={inputRef}

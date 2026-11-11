@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Download, Loader2, Trash2, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatTime } from './Transport';
 
-export default function StudioTopBar({ stemCount, duration, sampleRate, exporting, onExport, onClear, canExport }) {
+export default function StudioTopBar({ stemCount, duration, sampleRate, exporting, onExport, onClear, canExport, onSecret }) {
+  // Five quick taps on the logo open the locked door (works on a phone too).
+  const taps = useRef([]);
+  const tap = () => {
+    const now = Date.now();
+    taps.current = [...taps.current.filter((t) => now - t < 2000), now];
+    if (taps.current.length >= 5) {
+      taps.current = [];
+      onSecret?.();
+    }
+  };
   return (
     <header className="sticky top-0 z-20 border-b border-hairline bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1680px] flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 lg:px-8">
-        <div className="flex items-center gap-3">
+        <div className="flex select-none items-center gap-3" onClick={tap}>
           <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
             <Waves className="h-4 w-4" />
           </span>
