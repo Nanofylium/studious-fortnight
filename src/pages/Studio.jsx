@@ -26,6 +26,7 @@ import { PUBLIC_EDITION } from '@/lib/edition';
 // The editor pulls in waveform-playlist and Tone.js: its own chunk, loaded
 // when the view is opened.
 const DawView = lazy(() => import('@/components/studio/DawView'));
+const SingView = lazy(() => import('@/components/studio/SingView'));
 const OwnerPanels = PUBLIC_EDITION ? null : lazy(() => import('@/components/studio/OwnerPanels'));
 const BloopersGate = PUBLIC_EDITION ? null : lazy(() => import('@/components/studio/BloopersGate'));
 
@@ -202,6 +203,63 @@ export default function Studio() {
     setDawTracks((t) => t ?? tracksFromStems(stems));
     setView('daw');
   }, [stems]);
+
+  // "Cantar": an instrumental, the user's takes over it and the chosen one.
+  // Lives here so leaving the view keeps the takes.
+  const [sing, setSing] = useState({
+    instrumental: null,
+    takes: [],
+    chosen: null,
+    offsetMs: null,
+    voiceDb: 0,
+    backingGain: 0.9,
+  });
+  const openSing = useCallback(() => {
+    engineRef.current?.stop();
+    setPlaying(false);
+    setView('sing');
+  }, []);
+
+  // Session settings for a set of stems, as adoptStems would leave them, with
+  // the voice moved by `voiceDb` against the auto mix.
+  const sungSession = useCallback(
+    (list, voiceDb) => {
+      const levels = autoMix(list);
+      for (const s of list) {
+        if (s.role?.key === 'vocals') levels[s.id] = { ...levels[s.id], gain: clamp(levels[s.id].gain * 10 ** (voiceDb / 20), 0.05, 4) };
+      }
+      const summary = summarizeMix(list);
+      const lufs = excerptMixLufs(list, levels, 40);
+      const m = { ...master, ...suggestedMaster(summary), makeupDb: clamp(master.targetLufs - lufs, -12, 16), bypass: false };
+      return { levels, master: m };
+    },
+    [master],
+  );
+
+  // "Gerar minha música": voice + instrumental through the smart mix and the
+  // master, the same chain as "Baixar master".
+  const handleSingRender = useCallback(
+    async (list, voiceDb) => {
+      const { levels, master: m } = sungSession(list, voiceDb);
+      const params = { ...m, stems: levels, soloId: null, matchCurve: null, mixPlan: planMix(list) };
+      return renderMaster(list, params);
+    },
+    [sungSession],
+  );
+
+  // "Ajustar na mixagem": the two stems become the session.
+  const handleSingToMix = useCallback(
+    (list, voiceDb) => {
+      if (!list) return;
+      adoptStems(list);
+      // Same ids as the stems adoptStems keeps, so the voice balance carries over.
+      setMixParams(sungSession(list, voiceDb).levels);
+      setReference(null);
+      setSoloId(null);
+      setView('mix');
+    },
+    [adoptStems, sungSession],
+  );
 
   // "Usar na mixagem": the edited tracks become the session's stems. Tracks
   // that came from a stem keep its name and role; recorded ones are vocals.
@@ -503,16 +561,17 @@ export default function Studio() {
         </Suspense>
       )}
 
-      {(stems.length > 0 || view === 'daw') && (
+      {(stems.length > 0 || view !== 'mix') && (
         <div className="mx-auto flex w-full max-w-[1680px] items-center gap-1 px-4 pt-4 lg:px-8">
           {[
             ['mix', 'Mixagem e master'],
+            ['sing', 'Cantar'],
             ['daw', 'Editar e gravar'],
           ].map(([key, label]) => (
             <button
               key={key}
               type="button"
-              onClick={() => (key === 'daw' ? openDaw() : setView('mix'))}
+              onClick={() => (key === 'daw' ? openDaw() : key === 'sing' ? openSing() : setView('mix'))}
               className={`rounded-full px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] transition-colors ${
                 view === key ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -523,7 +582,19 @@ export default function Studio() {
         </div>
       )}
 
-      {view === 'daw' ? (
+      {view === 'sing' ? (
+        <div className="mx-auto w-full max-w-[1680px] px-4 pt-6 lg:px-8">
+          <Suspense
+            fallback={
+              <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Abrindo…
+              </p>
+            }
+          >
+            <SingView sing={sing} setSing={setSing} onRender={handleSingRender} onOpenMix={handleSingToMix} />
+          </Suspense>
+        </div>
+      ) : view === 'daw' ? (
         <div className="mx-auto w-full max-w-[1680px] px-4 pt-4 lg:px-8">
           <Suspense
             fallback={
@@ -543,7 +614,7 @@ export default function Studio() {
           {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
         </div>
       ) : stems.length === 0 ? (
-        <StemDropzone onFiles={handleFiles} busy={busy} error={error} onRecord={openDaw} />
+        <StemDropzone onFiles={handleFiles} busy={busy} error={error} onRecord={openDaw} onSing={openSing} />
       ) : (
         <div className="mx-auto w-full max-w-[1680px] px-4 pt-6 lg:px-8">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_370px]">
