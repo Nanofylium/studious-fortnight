@@ -9,7 +9,7 @@ const CHIPS = [
   { icon: Music, title: 'Master para release', text: 'Limitador e volume alvo de streaming, pronto para subir.' },
 ];
 
-export default function StemDropzone({ onFiles, busy, error, onRecord }) {
+export default function StemDropzone({ onFiles, busy, error, onRecord, onSing }) {
   const inputRef = useRef(null);
   const [over, setOver] = useState(false);
 
@@ -49,6 +49,14 @@ export default function StemDropzone({ onFiles, busy, error, onRecord }) {
         </Button>
 
         <p className="num mt-4 text-[11px] text-muted-foreground">WAV · MP3 · FLAC · M4A — até 12 stems</p>
+        {onSing && (
+          <div className="mt-6">
+            <Button variant="outline" className="h-11 gap-2 border-red-500/40 px-6 text-[13px] hover:bg-red-500/10" onClick={onSing} disabled={!!busy}>
+              <Mic className="h-4 w-4 text-red-400" /> Cantar sobre um instrumental
+            </Button>
+            <p className="mt-2 text-[11px] text-muted-foreground">Grave a sua voz por cima da base e receba a música pronta.</p>
+          </div>
+        )}
         {onRecord && (
           <button
             type="button"

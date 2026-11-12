@@ -3,6 +3,8 @@ import { integratedLufs } from './loudness.js';
 
 const ROLES = [
   { key: 'vocals', label: 'Vocal', test: /(vocal|vox|lead|voz|vozes)/i, gain: 0.94, pan: 0 },
+  // A finished backing track (the user sings over it): full range, centred.
+  { key: 'instrumental', label: 'Instrumental', test: /(instrumental|playback|karaok)/i, gain: 0.8, pan: 0 },
   { key: 'drums', label: 'Bateria', test: /(drum|perc|kick|beat|bateria|snare|hi.?hat)/i, gain: 0.88, pan: 0 },
   { key: 'bass', label: 'Baixo', test: /(bass|baixo|sub|808|contrabaixo)/i, gain: 0.86, pan: 0 },
   { key: 'guitar', label: 'Guitarra', test: /(guitar|gtr|violao|violão)/i, gain: 0.8, pan: -0.18 },
@@ -10,6 +12,8 @@ const ROLES = [
   { key: 'strings', label: 'Cordas', test: /(string|violin|cello|orchest|cordas|sax|brass|horn)/i, gain: 0.7, pan: 0.16 },
   { key: 'other', label: 'Outros', test: /.*/, gain: 0.72, pan: 0.12 },
 ];
+
+export const roleByKey = (key) => ROLES.find((r) => r.key === key) || ROLES[ROLES.length - 1];
 
 export function guessRole(fileName = '') {
   const base = fileName.replace(/\.[^.]+$/, '');

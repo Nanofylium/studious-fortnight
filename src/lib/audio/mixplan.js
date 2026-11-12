@@ -16,9 +16,9 @@ import { applyBiquad, biquad } from './loudness.js';
 
 export const ENV_RATE = 3000;
 
-const HIGHPASS = { vocals: 90, drums: 30, bass: 30, guitar: 100, keys: 110, strings: 120, other: 80 };
-const SEND = { vocals: 0.14, drums: 0.05, bass: 0, guitar: 0.11, keys: 0.12, strings: 0.14, other: 0.1 };
-const POCKET_ROLES = new Set(['guitar', 'keys', 'strings', 'other']);
+const HIGHPASS = { instrumental: 28, vocals: 90, drums: 30, bass: 30, guitar: 100, keys: 110, strings: 120, other: 80 };
+const SEND = { instrumental: 0.03, vocals: 0.14, drums: 0.05, bass: 0, guitar: 0.11, keys: 0.12, strings: 0.14, other: 0.1 };
+const POCKET_ROLES = new Set(['instrumental', 'guitar', 'keys', 'strings', 'other']);
 
 function monoOf(buffer) {
   const n = buffer.length;
