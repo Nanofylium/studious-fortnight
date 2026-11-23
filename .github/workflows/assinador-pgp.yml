@@ -1,0 +1,56 @@
+name: Assinador PGP (Windows)
+
+on:
+  push:
+    paths:
+      - "tools/assinador-pgp/**"
+      - ".github/workflows/assinador-pgp.yml"
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: tools/assinador-pgp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.7"
+          cache-dependency-path: tools/assinador-pgp/go.sum
+      - name: Compilar
+        env:
+          CGO_ENABLED: "0"
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go vet .
+          go build -trimpath -ldflags "-H windowsgui -s -w -buildid=" -o Assinador-DagDos.exe .
+          sha256sum Assinador-DagDos.exe
+      - name: Autoteste na janela de verdade
+        run: |
+          ./Assinador-DagDos.exe --autoteste "$RUNNER_TEMP/teste" &
+          pid=$!
+          for i in $(seq 150); do [ -f "$RUNNER_TEMP/teste/resultado.json" ] && break; sleep 1; done
+          sleep 2
+          cat "$RUNNER_TEMP/teste/resultado.json"
+          grep -q '"ok": true' "$RUNNER_TEMP/teste/resultado.json"
+      - name: Conferir com o gpg
+        run: |
+          T="$RUNNER_TEMP/teste"
+          export GNUPGHOME="$RUNNER_TEMP/gpg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+          gpg --version | head -1
+          gpg --import "$T/dag-dos-chave-publica.asc"
+          gpg --verify "$T/álbum teste.zip.asc" "$T/álbum teste.zip"
+          gpg --verify "$T/capa.jpg.asc" "$T/capa.jpg"
+          printf 'x' >> "$T/capa.jpg"
+          if gpg --verify "$T/capa.jpg.asc" "$T/capa.jpg"; then echo "deveria falhar"; exit 1; else echo "alterado: BAD signature, como esperado"; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Assinador-DagDos
+          path: |
+            tools/assinador-pgp/Assinador-DagDos.exe
+            ${{ runner.temp }}/teste/resultado.json
