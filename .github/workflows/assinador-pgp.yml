@@ -48,7 +48,8 @@ jobs:
           export GNUPGHOME="$R/gpg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
           gpg --version | head -1
           ls -la "$T"
-          gpg --import "$T/dag-dos-chave-publica.asc"
+          # o diálogo "Salvar" usa a pasta Documentos e o nome sugerido
+          gpg --import "$(cygpath -u "$USERPROFILE")/Documents/dag-dos-chave-publica.asc"
           gpg --verify "$T/álbum teste.zip.asc" "$T/álbum teste.zip"
           gpg --verify "$T/capa.jpg.asc" "$T/capa.jpg"
           printf 'x' >> "$T/capa.jpg"
