@@ -43,8 +43,9 @@ jobs:
           grep -q '"ok": true' "$RUNNER_TEMP/teste/resultado.json"
       - name: Conferir com o gpg
         run: |
-          T="$RUNNER_TEMP/teste"
-          export GNUPGHOME="$RUNNER_TEMP/gpg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+          R="$(cygpath -u "$RUNNER_TEMP")"
+          T="$R/teste"
+          export GNUPGHOME="$R/gpg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
           gpg --version | head -1
           gpg --import "$T/dag-dos-chave-publica.asc"
           gpg --verify "$T/álbum teste.zip.asc" "$T/álbum teste.zip"
