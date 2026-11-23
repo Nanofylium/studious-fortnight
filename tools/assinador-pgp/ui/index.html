@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assinador Dağ Döş</title>
+<style>
+:root{
+  --bg:#03050a;--card:#0a0f18;--card2:#0e1522;--ink:#e4eefc;--muted:#8a9bb5;--line:#1c2a40;
+  --ice:#cfe0fa;--glow:#5d9cff;--accent:#7fb2ff;--accent-ink:#03050a;
+  --ok:#8fe0b0;--ok-bg:#0d241a;--bad:#ff9a9a;--bad-bg:#2a1013;--field:#060a12;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+body{background:radial-gradient(ellipse at 50% -10%,#0c1a33 0%,var(--bg) 60%) fixed}
+main{max-width:820px;margin:0 auto;padding:18px 16px 48px}
+header{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+header img{width:92px;height:92px;border-radius:50%;box-shadow:0 0 28px rgba(93,156,255,.35)}
+h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;letter-spacing:.06em;font-size:1.7rem;margin:0;color:var(--ice);text-shadow:0 0 18px rgba(93,156,255,.45)}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.93rem}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 14px}
+nav button{flex:1 1 auto;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 12px;border-radius:10px;font:inherit;cursor:pointer}
+nav button[aria-selected="true"]{border-color:var(--glow);box-shadow:0 0 0 1px var(--glow) inset,0 0 16px rgba(93,156,255,.25);color:var(--ice)}
+section{display:none;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+section.on{display:block}
+h2{font-family:Georgia,serif;font-weight:400;letter-spacing:.03em;color:var(--ice);font-size:1.25rem;margin:0 0 10px}
+h3{font-size:1rem;margin:22px 0 6px;color:var(--ice)}
+label{display:block;font-weight:600;margin:12px 0 4px;font-size:.92rem}
+input[type=text],input[type=email],input[type=password],textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);font:inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--glow)}
+textarea{min-height:130px;font-family:Consolas,ui-monospace,Menlo,monospace;font-size:.84rem;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.btn{border:0;background:linear-gradient(180deg,#a9cbff,#6fa6ff);color:var(--accent-ink);padding:10px 16px;border-radius:8px;font:inherit;font-weight:700;cursor:pointer}
+.btn.big{padding:16px 22px;font-size:1.05rem}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.btn.ghost:hover{border-color:var(--glow)}
+.btn:disabled{opacity:.5;cursor:default}
+.hint{color:var(--muted);font-size:.88rem;margin:6px 0 0}
+.msg{margin-top:12px;padding:12px 14px;border-radius:8px;display:none;white-space:pre-wrap;word-break:break-word}
+.msg.ok{display:block;background:var(--ok-bg);color:var(--ok);border:1px solid #1f4a33}
+.msg.bad{display:block;background:var(--bad-bg);color:var(--bad);border:1px solid #4a1f24}
+.msg.info{display:block;background:var(--field);border:1px solid var(--line)}
+.fp{font-family:Consolas,ui-monospace,Menlo,monospace;font-size:1rem;letter-spacing:.04em;color:var(--ice)}
+.keybox{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--card2);margin-top:6px}
+.lock{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--card2);margin-bottom:14px}
+.lock.aberta{border-color:#1f4a33}
+.hide{display:none!important}
+.lista{margin:8px 0 0;padding:0;list-style:none}
+.lista li{padding:6px 0;border-bottom:1px solid var(--line)}
+.lista li:last-child{border:0}
+.lista a{color:var(--accent);cursor:pointer;text-decoration:underline;margin-left:6px;font-size:.88rem}
+ol.passos{padding-left:20px;margin:6px 0}
+ol.passos li{margin:6px 0}
+code{font-family:Consolas,ui-monospace,Menlo,monospace;font-size:.86em;background:var(--field);border:1px solid var(--line);padding:1px 5px;border-radius:4px;white-space:nowrap}
+pre{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto;font-size:.84rem}
+footer{color:var(--muted);font-size:.78rem;margin-top:20px;text-align:center}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="{{LOGO}}" alt="">
+    <div>
+      <h1>Assinador Dağ Döş</h1>
+      <p class="sub">Assine qualquer arquivo ou texto com PGP. Funciona sem internet, e a chave secreta nunca sai deste computador.</p>
+    </div>
+  </header>
+
+  <nav role="tablist">
+    <button role="tab" data-tab="assinar" aria-selected="true">Assinar</button>
+    <button role="tab" data-tab="verificar">Verificar</button>
+    <button role="tab" data-tab="chave">Minha chave</button>
+    <button role="tab" data-tab="provar">Como provar que fui eu</button>
+  </nav>
+
+  <!-- ASSINAR -->
+  <section id="assinar" class="on">
+    <div id="avisoSemChave" class="msg info">Primeiro crie a sua chave na aba <strong>Minha chave</strong>. É um clique.</div>
+    <div id="lockBox" class="lock hide">
+      <div id="lockTravada">
+        <label for="senha" style="margin-top:0">Senha da chave</label>
+        <div class="row" style="margin-top:4px">
+          <input id="senha" type="password" style="flex:1 1 220px" autocomplete="current-password">
+          <button class="btn" id="btnDestravar">Destravar</button>
+        </div>
+        <p class="hint">Digite uma vez. Fica destravada até fechar o programa.</p>
+      </div>
+      <div id="lockAberta" class="row hide" style="margin-top:0;justify-content:space-between">
+        <span>🔓 Chave destravada: <strong id="lockNome"></strong></span>
+        <button class="btn ghost" id="btnTravar">Travar</button>
+      </div>
+    </div>
+
+    <h2>Arquivos</h2>
+    <p class="hint" style="margin-top:0">Qualquer arquivo: .zip, .jpg, .wav, .pdf. O arquivo não muda. Ao lado dele aparece um <code>.asc</code> com a assinatura (ex.: <code>capa.jpg</code> → <code>capa.jpg.asc</code>). Mande os dois juntos.</p>
+    <div class="row"><button class="btn big" id="btnEscolher">Escolher arquivos e assinar</button></div>
+    <p class="hint">Dica: arrastar arquivos para cima do ícone do programa também abre pronto para assinar.</p>
+    <div class="msg" id="aMsg"></div>
+    <ul class="lista" id="aLista"></ul>
+
+    <h2 style="margin-top:26px">Texto</h2>
+    <textarea id="tEntrada" placeholder="Escreva ou cole aqui: um aviso, uma letra, o texto cifrado de uma música…"></textarea>
+    <div class="row"><button class="btn" id="btnAssTexto">Assinar texto</button></div>
+    <div class="msg" id="tMsg"></div>
+    <div id="tSaidaBox" class="hide">
+      <label for="tSaida">Texto assinado</label>
+      <textarea id="tSaida" readonly style="min-height:200px"></textarea>
+      <div class="row"><button class="btn" id="btnCopiaTexto">Copiar</button></div>
+    </div>
+  </section>
+
+  <!-- VERIFICAR -->
+  <section id="verificar">
+    <h2>Verificar um arquivo</h2>
+    <p class="hint" style="margin-top:0">Escolha o arquivo (ou o <code>.asc</code> dele). A assinatura ao lado é achada sozinha.</p>
+    <div class="row"><button class="btn big" id="btnVerArq">Escolher arquivo para verificar</button></div>
+    <h3>ou um texto assinado</h3>
+    <textarea id="vTexto" placeholder="-----BEGIN PGP SIGNED MESSAGE-----"></textarea>
+    <div class="row"><button class="btn" id="btnVerTexto">Verificar texto</button></div>
+    <h3>Chave de outra pessoa (opcional)</h3>
+    <p class="hint" style="margin-top:0">Em branco, confere com a chave do Dağ Döş deste computador.</p>
+    <textarea id="vChave" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----" style="min-height:70px"></textarea>
+    <div class="msg" id="vMsg"></div>
+  </section>
+
+  <!-- CHAVE -->
+  <section id="chave">
+    <div id="semChave">
+      <h2>Gerar o par de chaves</h2>
+      <p class="hint" style="margin-top:0">Cria duas chaves que andam juntas: a <strong>secreta</strong> (só sua, assina) e a <strong>pública</strong> (de todo mundo, confere). Faça isso uma vez só.</p>
+      <label for="gNome">Nome</label>
+      <input id="gNome" type="text" value="Dağ Döş">
+      <label for="gEmail">E-mail (opcional)</label>
+      <input id="gEmail" type="email" placeholder="contato@dagdosmusic.com.br">
+      <label for="gSenha">Senha da chave</label>
+      <input id="gSenha" type="password" autocomplete="new-password">
+      <label for="gSenha2">Repita a senha</label>
+      <input id="gSenha2" type="password" autocomplete="new-password">
+      <p class="hint">Use uma frase longa que você não esquece. Sem ela ninguém assina, nem você.</p>
+      <div class="row"><button class="btn big" id="btnGerar">Gerar par de chaves</button></div>
+      <div class="msg" id="gMsg"></div>
+
+      <h3>Já tenho uma chave</h3>
+      <p class="hint" style="margin-top:0">Abra o backup da chave secreta (<code>.asc</code>), feito por este programa, pela página do assinador ou pelo gpg/Kleopatra.</p>
+      <div class="row"><button class="btn ghost" id="btnImportar">Abrir backup da chave secreta</button></div>
+      <div class="msg" id="iMsg"></div>
+    </div>
+
+    <div id="comChave" class="hide">
+      <h2>Sua chave</h2>
+      <div class="keybox">
+        <div><strong id="kNome"></strong></div>
+        <div class="hint" style="margin:2px 0 4px">Impressão digital (é a "identidade" da chave)</div>
+        <div class="fp" id="kFp"></div>
+        <div class="hint" id="kData"></div>
+      </div>
+
+      <h3>1. Publicar a chave pública</h3>
+      <p class="hint" style="margin-top:0">Coloque no site, ex.: <code>dagdosmusic.com.br/dagdos.asc</code>, e escreva a impressão digital na mesma página.</p>
+      <div class="row">
+        <button class="btn" id="btnPub">Salvar chave pública</button>
+        <button class="btn ghost" id="btnPubCopia">Copiar chave pública</button>
+      </div>
+
+      <h3>2. Guardar o backup</h3>
+      <p class="hint" style="margin-top:0">Guarde num pendrive ou cofre de senhas. Nunca publique estes dois.</p>
+      <div class="row">
+        <button class="btn ghost" id="btnPriv">Salvar backup da chave secreta</button>
+        <button class="btn ghost" id="btnRev">Salvar certificado de revogação</button>
+      </div>
+      <p class="hint">O certificado de revogação avisa o mundo que a chave não vale mais, se ela vazar ou a senha for perdida.</p>
+
+      <h3>Este computador</h3>
+      <p class="hint" style="margin-top:0">A chave fica guardada (protegida pela senha) em <code id="kPasta"></code></p>
+      <div class="row"><button class="btn ghost" id="btnRemover">Remover chave deste computador</button></div>
+      <div class="msg" id="kMsg"></div>
+    </div>
+  </section>
+
+  <!-- PROVAR -->
+  <section id="provar">
+    <h2>Como alguém confirma que foi você</h2>
+    <p>A ideia é simples: só a sua chave <strong>secreta</strong> consegue fazer uma assinatura que a sua chave <strong>pública</strong> aceita. Se mudar um único byte do arquivo, a assinatura deixa de bater.</p>
+    <ol class="passos">
+      <li><strong>Você publica</strong> a chave pública e a impressão digital num lugar que é seu: o site <code>dagdosmusic.com.br</code>, a bio do Instagram, o Bandcamp. Quanto mais lugares seus mostrarem a mesma impressão digital, mais difícil alguém se passar por você.</li>
+      <li><strong>Você assina</strong> o arquivo aqui e manda o arquivo junto com o <code>.asc</code>.</li>
+      <li><strong>A pessoa baixa</strong> a sua chave pública do site e confere a impressão digital.</li>
+      <li><strong>A pessoa verifica</strong> com qualquer programa PGP. Se aparecer "assinatura boa" com o nome Dağ Döş e a mesma impressão digital do site, foi você, e o arquivo é exatamente o que você assinou.</li>
+    </ol>
+    <h3>Com o gpg (Windows, Mac, Linux)</h3>
+<pre>gpg --import dag-dos-chave-publica.asc
+gpg --verify capa.jpg.asc capa.jpg</pre>
+    <p class="hint">Deve aparecer <code>Good signature from "Dağ Döş"</code> e a impressão digital. O aviso "not certified with a trusted signature" é normal: só quer dizer que a pessoa ainda não marcou sua chave como confiável no gpg dela.</p>
+    <h3>No Kleopatra (Windows) ou GPG Suite (Mac)</h3>
+    <p class="hint" style="margin-top:0">Importar a chave pública, depois clicar com o botão direito no <code>.asc</code> e escolher verificar.</p>
+    <h3>Neste programa</h3>
+    <p class="hint" style="margin-top:0">Aba Verificar. Se for a sua chave, aparece "Assinado por Dağ Döş" em verde.</p>
+  </section>
+
+  <footer>Formato OpenPGP (Ed25519) · compatível com gpg, Kleopatra, GPG Suite</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var st={},pendentes=null;
+function $(id){return document.getElementById(id)}
+function show(id,kind,text){var e=$(id);e.className="msg "+kind;e.textContent=text}
+function clear(id){var e=$(id);e.className="msg";e.textContent=""}
+function msgErro(e){return typeof e==="string"?e:(e&&e.message)||String(e)}
+function copiar(txt,msgId){
+  var t=document.createElement("textarea");t.value=txt;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();
+  var ok=false;try{ok=document.execCommand("copy")}catch(e){}
+  t.remove();
+  if(ok)show(msgId,"ok","Copiado.");
+  else if(navigator.clipboard)navigator.clipboard.writeText(txt).then(function(){show(msgId,"ok","Copiado.")},function(){show(msgId,"bad","Não deu para copiar.")});
+}
+async function acao(btn,fn){btn.disabled=true;try{await fn()}finally{btn.disabled=false}}
+
+Array.prototype.forEach.call(document.querySelectorAll("nav button"),function(b){
+  b.addEventListener("click",function(){irPara(b.dataset.tab)});
+});
+function irPara(tab){
+  Array.prototype.forEach.call(document.querySelectorAll("nav button"),function(x){x.setAttribute("aria-selected",x.dataset.tab===tab?"true":"false")});
+  Array.prototype.forEach.call(document.querySelectorAll("section"),function(s){s.classList.toggle("on",s.id===tab)});
+}
+
+function aplicar(s){
+  st=s||st;
+  $("semChave").classList.toggle("hide",st.temChave);$("comChave").classList.toggle("hide",!st.temChave);
+  $("avisoSemChave").classList.toggle("hide",st.temChave);
+  $("lockBox").classList.toggle("hide",!st.temChave);
+  $("lockBox").classList.toggle("aberta",!!st.destravada);
+  $("lockTravada").classList.toggle("hide",!!st.destravada);$("lockAberta").classList.toggle("hide",!st.destravada);
+  if(st.temChave){
+    $("kNome").textContent=st.nome;$("lockNome").textContent=st.nome;
+    $("kFp").textContent=st.impressao;$("kData").textContent="Criada em "+st.criada;
+    $("kPasta").textContent=st.pasta;
+  }
+}
+
+async function destravar(){
+  var s=$("senha").value;
+  if(!s){show("aMsg","bad","Digite a senha da chave.");$("senha").focus();return false}
+  try{aplicar(await pgpDestravar(s));$("senha").value="";clear("aMsg");if(pendentes){var p=pendentes;pendentes=null;setTimeout(function(){assinarCaminhos(p)},0)}return true}
+  catch(e){show("aMsg","bad",msgErro(e));$("senha").select();return false}
+}
+async function garantirAberta(){
+  if(!st.temChave){irPara("chave");return false}
+  if(st.destravada)return true;
+  return destravar();
+}
+$("btnDestravar").addEventListener("click",function(){acao(this,destravar)});
+$("senha").addEventListener("keydown",function(e){if(e.key==="Enter")destravar()});
+$("btnTravar").addEventListener("click",async function(){aplicar(await pgpTravar())});
+
+// assinar arquivos
+async function assinarCaminhos(caminhos){
+  if(!caminhos||!caminhos.length)return;
+  if(!(await garantirAberta())){show("aMsg","info",(st.temChave?"Digite a senha e clique Destravar. ":"")+"Os arquivos esperam:\n"+caminhos.join("\n"));pendentes=caminhos;return}
+  show("aMsg","info","Assinando "+caminhos.length+" arquivo(s)…");
+  try{
+    var r=await pgpAssinarCaminhos(caminhos);
+    var ok=r.filter(function(x){return !x.erro}).length;
+    show("aMsg",ok===r.length?"ok":"bad",ok===r.length?"Pronto. "+ok+" arquivo(s) assinado(s). A assinatura ficou ao lado de cada um.":"Alguns arquivos falharam.");
+    var ul=$("aLista");ul.innerHTML="";
+    r.forEach(function(x){
+      var li=document.createElement("li");
+      li.textContent=x.erro?("✖ "+x.arquivo+": "+x.erro):("✔ "+x.arquivo+"  →  "+x.assinatura);
+      if(!x.erro){var a=document.createElement("a");a.textContent="mostrar na pasta";a.onclick=function(){pgpMostrarNaPasta(x.caminho+".asc")};li.appendChild(a)}
+      ul.appendChild(li);
+    });
+  }catch(e){show("aMsg","bad",msgErro(e))}
+}
+$("btnEscolher").addEventListener("click",function(){acao(this,async function(){
+  if(!st.temChave){irPara("chave");show("gMsg","info","Crie sua chave primeiro.");return}
+  if(!(await garantirAberta()))return;
+  var fs=await pgpEscolherArquivos();
+  await assinarCaminhos(fs);
+})});
+
+// assinar texto
+$("btnAssTexto").addEventListener("click",function(){acao(this,async function(){
+  if(!$("tEntrada").value.trim())return show("tMsg","bad","Escreva o texto primeiro.");
+  if(!(await garantirAberta()))return show("tMsg","bad","Digite a senha lá em cima e clique Destravar.");
+  try{$("tSaida").value=await pgpAssinarTexto($("tEntrada").value);$("tSaidaBox").classList.remove("hide");show("tMsg","ok","Assinado por "+st.nome+".")}
+  catch(e){show("tMsg","bad",msgErro(e))}
+})});
+$("btnCopiaTexto").addEventListener("click",function(){copiar($("tSaida").value,"tMsg")});
+
+// verificar
+function mostrarResultado(r){
+  if(r.valida){
+    var t=(r.ehDono?"✔ Assinado por Dağ Döş (a sua chave)":"✔ Assinatura válida")+"\n";
+    if(r.arquivo)t+="Arquivo: "+r.arquivo+"\n";
+    t+="Quem assinou: "+r.quem+"\nImpressão digital: "+r.impressao+"\nQuando: "+r.data;
+    show("vMsg","ok",t);
+  }else show("vMsg","bad",(r.arquivo?r.arquivo+"\n":"")+r.motivo);
+}
+$("btnVerArq").addEventListener("click",function(){acao(this,async function(){
+  try{var c=await pgpEscolherParaVerificar();if(!c)return;show("vMsg","info","Verificando…");mostrarResultado(await pgpVerificarCaminho(c,$("vChave").value))}
+  catch(e){show("vMsg","bad",msgErro(e))}
+})});
+$("btnVerTexto").addEventListener("click",function(){acao(this,async function(){
+  try{mostrarResultado(await pgpVerificarTexto($("vTexto").value,$("vChave").value))}
+  catch(e){show("vMsg","bad",msgErro(e))}
+})});
+
+// chave
+$("btnGerar").addEventListener("click",function(){acao(this,async function(){
+  var s1=$("gSenha").value,s2=$("gSenha2").value;
+  if(s1!==s2)return show("gMsg","bad","As duas senhas não são iguais.");
+  show("gMsg","info","Gerando…");
+  try{
+    aplicar(await pgpGerarChave($("gNome").value,$("gEmail").value,s1));
+    $("gSenha").value=$("gSenha2").value="";clear("gMsg");
+    show("kMsg","ok","Par de chaves criado. Agora: salve a chave pública para o site, e guarde o backup e o certificado de revogação fora do computador.");
+  }catch(e){show("gMsg","bad",msgErro(e))}
+})});
+$("btnImportar").addEventListener("click",function(){acao(this,async function(){
+  try{var s=await pgpImportarChave();aplicar(s);if(s.temChave)show("kMsg","ok","Chave aberta. Digite a senha na aba Assinar para usar.")}
+  catch(e){show("iMsg","bad",msgErro(e))}
+})});
+function exportar(qual){return function(){acao(this,async function(){
+  try{var p=await pgpExportar(qual);if(p)show("kMsg","ok","Salvo em:\n"+p)}
+  catch(e){show("kMsg","bad",msgErro(e))}
+})}}
+$("btnPub").addEventListener("click",exportar("publica"));
+$("btnPriv").addEventListener("click",exportar("secreta"));
+$("btnRev").addEventListener("click",exportar("revogacao"));
+$("btnPubCopia").addEventListener("click",async function(){try{copiar(await pgpChavePublica(),"kMsg")}catch(e){show("kMsg","bad",msgErro(e))}});
+$("btnRemover").addEventListener("click",async function(){
+  if(this.dataset.conf!=="1"){this.dataset.conf="1";this.textContent="Clique de novo para confirmar (salvou o backup?)";return}
+  this.dataset.conf="";this.textContent="Remover chave deste computador";
+  aplicar(await pgpRemoverChave());clear("kMsg");
+});
+
+// início
+(async function(){
+  try{
+    aplicar(await pgpEstado());
+    var args=await pgpArgumentos();
+    if(!st.temChave)irPara("chave");
+    if(args&&args.length){
+      var asc=args.filter(function(a){return /\.(asc|sig)$/i.test(a)});
+      if(asc.length===args.length){irPara("verificar");mostrarResultado(await pgpVerificarCaminho(args[0],""))}
+      else if(st.temChave){show("aMsg","info","Digite a senha e clique Destravar para assinar:\n"+args.join("\n"));pendentes=args;$("senha").focus()}
+    }
+  }catch(e){show("aMsg","bad",msgErro(e))}
+  window.__pronto=true;
+})();
+})();
+</script>
+</body>
+</html>
