@@ -74,6 +74,7 @@ var (
 	procSendMessageW             = user32.NewProc("SendMessageW")
 	procPostMessageW             = user32.NewProc("PostMessageW")
 	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
+	procGetGUIThreadInfo         = user32.NewProc("GetGUIThreadInfo")
 )
 
 func classe(h uintptr) string {
@@ -96,6 +97,56 @@ func acharDialogo() uintptr {
 	})
 	procEnumWindows.Call(cb, 0)
 	return achado
+}
+
+type guiThreadInfo struct {
+	cbSize, flags                                      uint32
+	active, focus, capture, menuOwner, moveSize, caret uintptr
+	rc                                                 [4]int32
+}
+
+// campoComFoco: o diálogo abre com o cursor no campo do nome do arquivo.
+func campoComFoco(dlg uintptr) uintptr {
+	tid, _, _ := procGetWindowThreadProcessId.Call(dlg, 0)
+	var gi guiThreadInfo
+	gi.cbSize = uint32(unsafe.Sizeof(gi))
+	if r, _, _ := procGetGUIThreadInfo.Call(tid, uintptr(unsafe.Pointer(&gi))); r == 0 {
+		return 0
+	}
+	if gi.focus != 0 && classe(gi.focus) == "Edit" {
+		return gi.focus
+	}
+	return 0
+}
+
+func filhos(dlg uintptr) string {
+	var out string
+	cb := syscall.NewCallback(func(h, _ uintptr) uintptr {
+		id, _, _ := procGetDlgCtrlID.Call(h)
+		out += classe(h) + "#" + itoa(int(id)) + " "
+		return 1
+	})
+	procEnumChildWindows.Call(dlg, cb, 0)
+	return out
+}
+
+func itoa(i int) string {
+	if i == 0 {
+		return "0"
+	}
+	n := ""
+	neg := i < 0
+	if neg {
+		i = -i
+	}
+	for i > 0 {
+		n = string(rune('0'+i%10)) + n
+		i /= 10
+	}
+	if neg {
+		n = "-" + n
+	}
+	return n
 }
 
 // campo "Nome do arquivo": controle de ID 1148 (cmb13) ou 1152 (edt1), ou o Edit dentro dele.
@@ -145,7 +196,12 @@ func (t *autoteste) preencher(caminho string) {
 			time.Sleep(400 * time.Millisecond)
 			ed := acharCampoNome(dlg)
 			if ed == 0 {
-				t.log("campo do nome ainda não achado")
+				ed = campoComFoco(dlg)
+			}
+			if ed == 0 {
+				if i%10 == 0 {
+					t.log("campo do nome não achado; filhos: " + filhos(dlg))
+				}
 				continue
 			}
 			p, _ := syscall.UTF16PtrFromString(caminho)
