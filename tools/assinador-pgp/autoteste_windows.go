@@ -34,9 +34,9 @@ func novoAutoteste(dir string) *autoteste {
 	_ = os.WriteFile(filepath.Join(dir, "álbum teste.zip"), []byte("PK conteudo de teste do zip \x00\x01\x02"), 0o644)
 	_ = os.WriteFile(filepath.Join(dir, "capa.jpg"), []byte("\xff\xd8\xff jpeg de teste"), 0o644)
 	t.fila = []string{
-		filepath.Join(dir, "álbum teste.zip"),           // escolher arquivos para assinar
-		filepath.Join(dir, "dag-dos-chave-publica.asc"), // salvar chave pública
-		filepath.Join(dir, "álbum teste.zip"),           // verificar arquivo
+		filepath.Join(dir, "dag-dos-chave-publica.asc"), // 1. salvar chave pública
+		filepath.Join(dir, "álbum teste.zip"),           // 2. escolher arquivos para assinar
+		filepath.Join(dir, "álbum teste.zip"),           // 3. verificar arquivo
 	}
 	go func() {
 		time.Sleep(120 * time.Second)
