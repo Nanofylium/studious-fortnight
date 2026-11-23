@@ -231,6 +231,7 @@ const roteiroJS = `
     P("chave gerada");
     $("btnPub").click();
     await esperar(function(){return /Salvo/.test($("kMsg").textContent)});
+    R.salvoPublica=$("kMsg").textContent;
     P("chave publica salva pelo dialogo");
     document.querySelector('nav button[data-tab=assinar]').click();
     $("btnEscolher").click();
