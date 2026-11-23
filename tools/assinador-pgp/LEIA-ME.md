@@ -9,7 +9,7 @@ Programa para Windows que assina qualquer arquivo ou texto com PGP (OpenPGP, cha
 ## Compilar (de qualquer sistema)
 
 ```
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-H windowsgui -s -w -buildid=" -o Assinador-DagDos.exe .
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w -buildid=" -o Assinador-DagDos.exe .
 ```
 
 O ícone e o manifesto estão em `rsrc_windows_amd64.syso`. Para refazer: `go run github.com/tc-hib/go-winres@v0.3.3 make --in winres/winres.json --arch amd64`.

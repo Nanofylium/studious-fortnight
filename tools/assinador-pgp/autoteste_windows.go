@@ -50,7 +50,16 @@ func (t *autoteste) gravar(v interface{}) {
 	_ = os.WriteFile(filepath.Join(t.dir, "resultado.json"), b, 0o644)
 }
 
+func (t *autoteste) log(m string) {
+	f, err := os.OpenFile(filepath.Join(t.dir, "teste.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err == nil {
+		f.WriteString(time.Now().Format("15:04:05.000") + " " + m + "\n")
+		f.Close()
+	}
+}
+
 func (t *autoteste) falhar(motivo string) {
+	t.log("FALHOU: " + motivo)
 	t.gravar(map[string]interface{}{"ok": false, "erro": motivo})
 	os.Exit(2)
 }
@@ -132,14 +141,17 @@ func (t *autoteste) preencher(caminho string) {
 			if dlg == 0 {
 				continue
 			}
+			t.log("diálogo achado")
 			time.Sleep(400 * time.Millisecond)
 			ed := acharCampoNome(dlg)
 			if ed == 0 {
+				t.log("campo do nome ainda não achado")
 				continue
 			}
 			p, _ := syscall.UTF16PtrFromString(caminho)
 			procSendMessageW.Call(ed, wmSetText, 0, uintptr(unsafe.Pointer(p)))
 			procPostMessageW.Call(dlg, wmCommand, idOK, 0)
+			t.log("preenchido: " + caminho)
 			return
 		}
 		t.falhar("o diálogo de arquivo não apareceu: " + caminho)
@@ -150,24 +162,25 @@ const roteiroJS = `
 (async function(){
   function $(id){return document.getElementById(id)}
   function esperar(f,ms){ms=ms||30000;var t0=Date.now();return new Promise(function(ok,no){(function v(){var r;try{r=f()}catch(e){}if(r)return ok(r);if(Date.now()-t0>ms)return no(new Error("esperou demais: "+f));setTimeout(v,100)})()})}
-  var R={passos:[]};
+  var R={passos:[]};function P(m){R.passos.push(m);try{pgpTesteLog(m)}catch(e){}}
+  P("script iniciou");
   try{
     await esperar(function(){return window.__pronto});
-    R.passos.push("pagina pronta");
+    P("pagina pronta");
     R.nomePadrao=$("gNome").value;
     $("gSenha").value="senha de teste longa";$("gSenha2").value="senha de teste longa";
     $("btnGerar").click();
     await esperar(function(){return !$("comChave").classList.contains("hide")});
     R.impressao=$("kFp").textContent;R.nome=$("kNome").textContent;
-    R.passos.push("chave gerada");
+    P("chave gerada");
     $("btnPub").click();
     await esperar(function(){return /Salvo/.test($("kMsg").textContent)});
-    R.passos.push("chave publica salva pelo dialogo");
+    P("chave publica salva pelo dialogo");
     document.querySelector('nav button[data-tab=assinar]').click();
     $("btnEscolher").click();
     await esperar(function(){return $("aLista").children.length>0});
     R.listaAssinatura=$("aLista").textContent;
-    R.passos.push("arquivo assinado pelo dialogo");
+    P("arquivo assinado pelo dialogo");
     var cam=await pgpArgumentos();
     var r2=await pgpAssinarCaminhos([TESTDIR+"\\capa.jpg"]);
     R.capa=r2[0];
@@ -175,7 +188,7 @@ const roteiroJS = `
     $("btnAssTexto").click();
     await esperar(function(){return $("tSaida").value.length>0});
     R.textoAssinado=$("tSaida").value;
-    R.passos.push("texto assinado");
+    P("texto assinado");
     document.querySelector('nav button[data-tab=verificar]').click();
     $("btnVerArq").click();
     await esperar(function(){return /Assinado|INVÁLIDA|Não/.test($("vMsg").textContent)});
@@ -200,9 +213,11 @@ func (t *autoteste) ligar(w webview2.WebView, plat *platWindows) {
 			return
 		}
 		c := t.fila[0]
+		t.log("vai abrir diálogo para " + c)
 		t.fila = t.fila[1:]
 		t.preencher(c)
 	}
+	_ = w.Bind("pgpTesteLog", func(m string) { t.log("js: " + m) })
 	_ = w.Bind("pgpTesteFim", func(s string) {
 		var v map[string]interface{}
 		_ = json.Unmarshal([]byte(s), &v)
